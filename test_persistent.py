@@ -174,7 +174,7 @@ def generate_voice(text: str, output_path: Path):
         compile=False,
         iterative_prompt=True,
         chunk_length=512,
-        prompt_text=PROMPT_TEXT,
+        prompt_text=[PROMPT_TEXT],
         prompt_tokens=[reference_codes],
     )
 
