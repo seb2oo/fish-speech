@@ -146,6 +146,11 @@ print(
 # GENERATION FUNCTION
 # ============================================================
 
+print("DEBUG prompt_text:", type(PROMPT_TEXT), PROMPT_TEXT)
+print("DEBUG reference_codes:", type(reference_codes), reference_codes.shape)
+print("DEBUG prompt_tokens:", type([reference_codes]))
+print("DEBUG prompt_tokens[0]:", type([reference_codes][0]))
+
 def generate_voice(text: str, output_path: Path):
 
     print()
