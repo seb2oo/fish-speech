@@ -1,43 +1,109 @@
+# FROM nvidia/cuda:12.9.0-cudnn-runtime-ubuntu24.04
+
+# ENV DEBIAN_FRONTEND=noninteractive
+# ENV PYTHONDONTWRITEBYTECODE=1
+# ENV PYTHONUNBUFFERED=1
+
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#     python3 \
+#     python3-dev \
+#     python3-pip \
+#     git \
+#     curl \
+#     ca-certificates \
+#     build-essential \
+#     cmake \
+#     libsox-dev \
+#     libasound-dev \
+#     portaudio19-dev \
+#     libportaudio2 \
+#     libportaudiocpp0 \
+#     ffmpeg \
+#     && rm -rf /var/lib/apt/lists/*
+
+# COPY --from=ghcr.io/astral-sh/uv:0.8.15 /uv /uvx /bin/
+
+# WORKDIR /app
+
+# COPY pyproject.toml uv.lock README.md ./
+
+# RUN uv python pin 3.12
+
+# pour s'assurer que ça prenne bien le cache ! Car la première fois ça n'a pas prit le cache...Certainement du a cet environnement UV
+# RUN --mount=type=cache,target=/root/.cache/uv \
+#     uv sync --extra cu129 --frozen --no-install-project
+
+# COPY . .
+
+# pour s'assurer que ça prenne bien le cache ! Car la première fois ça n'a pas prit le cache...Certainement du a cet environnement UV
+# RUN --mount=type=cache,target=/root/.cache/uv \
+#     uv sync --extra cu129 --frozen
+
+# RUN mkdir -p \
+#     /app/input \
+#     /app/output \
+#     /app/checkpoints
+
+# CMD ["bash"]
+
+# LA VERSION CI DESSUS PREND TROP DE TEMPS A SE CONSTRUIRE... CAR INSTALLE ABSOLUMENT TOUT ET ON N'A PAS FORCEMENT BESOIN DE TOUT
+# DE PLUS CONTIENT DES .VENV, DE UV , ETC ... C'EST VITE COMPLIQUE..
+# DONC ON INSTALL LE MIMINUM, ON FAIT TOUNER L'INFERENCES SOUS RUNPOD ET ON AJOUTER LES DEPENDANCES PAS A PAS !
+
 FROM nvidia/cuda:12.9.0-cudnn-runtime-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+# ============================================================
+# SYSTEM DEPENDENCIES
+# ============================================================
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
-    python3-dev \
     python3-pip \
     git \
-    curl \
     ca-certificates \
-    build-essential \
-    cmake \
-    libsox-dev \
-    libasound-dev \
-    portaudio19-dev \
-    libportaudio2 \
-    libportaudiocpp0 \
     ffmpeg \
+    libsox-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:0.8.15 /uv /uvx /bin/
+
+# ============================================================
+# PYTORCH
+# ============================================================
+
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    torch==2.8.0 \
+    torchaudio==2.8.0 \
+    --index-url https://download.pytorch.org/whl/cu129
+
+
+# ============================================================
+# FISH SPEECH DEPENDENCIES
+# ============================================================
+
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+    hydra-core \
+    numpy \
+    pyrootutils \
+    soundfile \
+    loguru \
+    natsort \
+    lightning \
+    rich
+
+
+# ============================================================
+# WORKSPACE
+# ============================================================
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock README.md ./
 
-RUN uv python pin 3.12
+# ============================================================
+# DEFAULT COMMAND
+# ============================================================
 
-RUN uv sync --extra cu129 --frozen --no-install-project
-
-COPY . .
-
-RUN uv sync --extra cu129 --frozen
-
-RUN mkdir -p \
-    /app/input \
-    /app/output \
-    /app/checkpoints
-
-ENTRYPOINT ["/bin/bash"]
+CMD ["bash"]

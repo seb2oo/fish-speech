@@ -74,6 +74,11 @@ filelists/
 # Audio Files
 # -----------
 *.wav
+# Keep project audio files
+!input/
+!input/*.wav
+!output/
+!output/*.wav
 *.mp3
 *.flac
 *.ogg
