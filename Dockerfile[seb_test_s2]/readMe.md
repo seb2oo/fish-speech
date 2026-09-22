@@ -358,3 +358,14 @@ python3 -m pip install --no-cache-dir --break-system-packages loguru
 python3 -m pip install --no-cache-dir --break-system-packages natsort
 python3 -m pip install --no-cache-dir --break-system-packages lightning
 python3 -m pip install --no-cache-dir --break-system-packages rich
+
+#modification du fichier gitignore
+
+# Audio Files
+# -----------
+*.wav
+# Keep project audio files
+!input/
+!input/*.wav
+!output/
+!output/*.wav
