@@ -51,7 +51,7 @@ model, decode_one_token = init_model(
     checkpoint_path=str(CHECKPOINT),
     device=DEVICE,
     precision=PRECISION,
-    compile=False,
+    compile=True,
 )
 
 torch.cuda.synchronize()
