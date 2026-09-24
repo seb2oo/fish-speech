@@ -66,6 +66,9 @@ if MEGACACHE_PATH.exists():
         artifact_bytes
     )
 
+    print("[MEGACACHE] INDUCTOR CACHE:", cache_info.artifacts.get("inductor"))
+    print("[MEGACACHE] AUTOTUNE COUNT:", len(cache_info.artifacts.get("autotune", [])))
+
     print(
         f"[MEGACACHE] Loaded "
         f"{len(artifact_bytes) / 1024 / 1024:.2f} MB "
