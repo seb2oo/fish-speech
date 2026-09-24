@@ -441,40 +441,40 @@ def init_model(checkpoint_path, device, precision, compile=False):
     # Mark whether cache has been initialized
     model._cache_setup_done = False
 
-    # if compile:
-    #     logger.info("Compiling function...")
-    #     decode_one_token = torch.compile(
-    #         decode_one_token,
-    #         backend="inductor" if torch.cuda.is_available() else "aot_eager",
-    #         mode="default" if torch.cuda.is_available() else None,
-    #         fullgraph=True,
-    #         dynamic=True,
-    #     )
-
-    #new start
     if compile:
-        logger.info("Compiling model forward functions separately...")
-
-        compile_backend = "inductor" if torch.cuda.is_available() else "aot_eager"
-        compile_mode = "default" if torch.cuda.is_available() else None
-
-        model.forward_generate = torch.compile(
-            model.forward_generate,
-            backend=compile_backend,
-            mode=compile_mode,
+        logger.info("Compiling function...")
+        decode_one_token = torch.compile(
+            decode_one_token,
+            backend="inductor" if torch.cuda.is_available() else "aot_eager",
+            mode="reduce-overhead" if torch.cuda.is_available() else None,
             fullgraph=True,
             dynamic=True,
         )
 
-        # model.forward_generate_fast = torch.compile(
-        #     model.forward_generate_fast,
-        #     backend=compile_backend,
-        #     mode=compile_mode,
-        #     fullgraph=True,
-        #     dynamic=True,
-        # )
+    #new start
+    # if compile:
+    #     logger.info("Compiling model forward functions separately...")
 
-        decode_one_token = decode_one_token_ar
+    #     compile_backend = "inductor" if torch.cuda.is_available() else "aot_eager"
+    #     compile_mode = "default" if torch.cuda.is_available() else None
+
+    #     model.forward_generate = torch.compile(
+    #         model.forward_generate,
+    #         backend=compile_backend,
+    #         mode=compile_mode,
+    #         fullgraph=True,
+    #         dynamic=True,
+    #     )
+
+    #     # model.forward_generate_fast = torch.compile(
+    #     #     model.forward_generate_fast,
+    #     #     backend=compile_backend,
+    #     #     mode=compile_mode,
+    #     #     fullgraph=True,
+    #     #     dynamic=True,
+    #     # )
+
+    #     decode_one_token = decode_one_token_ar
     #new end
 
     #new start
