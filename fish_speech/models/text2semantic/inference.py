@@ -237,8 +237,24 @@ def decode_n_tokens(
         if supports_kv_len:
             decode_kwargs["kv_len"] = kv_start_pos + i + 1
 
+        # with sdpa_kernel(SDPBackend.MATH):
+        #     next_token = decode_one_token(**decode_kwargs).clone()
+
+        # new start
+        if i == 0:
+            torch.cuda.synchronize()
+            t_compile = time.perf_counter()
+
         with sdpa_kernel(SDPBackend.MATH):
             next_token = decode_one_token(**decode_kwargs).clone()
+
+        if i == 0:
+            torch.cuda.synchronize()
+            logger.info(
+                f"[PROFILE] first compiled decode_one_token: "
+                f"{time.perf_counter() - t_compile:.3f}s"
+            )
+        # new end
 
         input_pos += 1
         cur_token = next_token.view(1, model.config.num_codebooks + 1, -1)
