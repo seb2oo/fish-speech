@@ -441,26 +441,26 @@ def init_model(checkpoint_path, device, precision, compile=False):
     # Mark whether cache has been initialized
     model._cache_setup_done = False
 
-    # if compile:
-    #     logger.info("Compiling function...")
-    #     decode_one_token = torch.compile(
-    #         decode_one_token,
-    #         backend="inductor" if torch.cuda.is_available() else "aot_eager",
-    #         mode="default" if torch.cuda.is_available() else None,
-    #         fullgraph=True,
-    #         dynamic=True,
-    #     )
-
-    #new start
     if compile:
         logger.info("Compiling function...")
         decode_one_token = torch.compile(
             decode_one_token,
             backend="inductor" if torch.cuda.is_available() else "aot_eager",
             mode="default" if torch.cuda.is_available() else None,
-            fullgraph=False,
-            dynamic=True,
+            fullgraph=True,
+            dynamic=False,
         )
+
+    #new start
+    # if compile:
+    #     logger.info("Compiling function...")
+    #     decode_one_token = torch.compile(
+    #         decode_one_token,
+    #         backend="inductor" if torch.cuda.is_available() else "aot_eager",
+    #         mode="default" if torch.cuda.is_available() else None,
+    #         fullgraph=False,
+    #         dynamic=True,
+    #     )
     # new end
 
     return model.eval(), decode_one_token
