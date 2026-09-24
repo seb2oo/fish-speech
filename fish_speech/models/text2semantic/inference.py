@@ -338,9 +338,9 @@ def generate(
     # [MODIFIED] Use tokenizer.get_token_id (Wrapper method)
     semantic_logit_bias[0, 0, model.tokenizer.get_token_id(IM_END_TOKEN)] = 0.0
 
-    # prefill_decode = decode_one_token_ar
+    prefill_decode = decode_one_token_ar
 
-    prefill_decode = decode_one_token
+    # prefill_decode = decode_one_token
 
     first_token = prefill_decode(
         model,
