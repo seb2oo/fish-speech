@@ -57,16 +57,27 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # ============================================================
+# TORCHINDUCTOR CACHE
+# ============================================================
+
+# local test with docker 
+ENV TORCHINDUCTOR_CACHE_DIR=/app/torchinductor-cache
+
+
+# ============================================================
 # SYSTEM DEPENDENCIES
 # ============================================================
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
+    python3.12-dev \
     git \
     ca-certificates \
     ffmpeg \
     libsox-dev \
+    gcc \
+    libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 
 
@@ -92,7 +103,14 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
     loguru \
     natsort \
     lightning \
-    rich
+    rich \
+    descript-audiotools \
+    descript-audio-codec \
+    "transformers<=4.57.3" \
+    loralib \
+    click \
+    runpod \
+    huggingface_hub
 
 
 # ============================================================
@@ -101,9 +119,29 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
 
 WORKDIR /app
 
+RUN mkdir -p /app/torchinductor-cache
 
 # ============================================================
-# DEFAULT COMMAND
+# SERVERLESS HANDLER
 # ============================================================
 
-CMD ["bash"]
+COPY Dockerfile_seb_test_s2/handler.py /app/handler.py
+
+
+## je le mets spécialemement ici pour ne pas reconstruire toute l'image
+# test in serveless to get in un cache
+ENV TORCHINDUCTOR_CACHE_DIR=/runpod-volume/torchinductor-cache
+
+
+
+# ============================================================
+# DEFAULT COMMAND (DOCKER)
+# ============================================================
+
+# CMD ["bash"]
+
+# ============================================================
+# START SERVERLESS WORKER
+# ============================================================
+
+CMD ["python3", "/app/handler.py"]

@@ -310,7 +310,7 @@ L'objectif sera d'avoir quelque chose du genre :
 OK ICI APRES ANALYSE PAR CHAT DU FICHIER "TOML" ET LES DOCKER ON EST PARTI SUR L'ARCHITECTURE CI-DESSOUS
 
 
-
+checkpoints/                     --> ce que l'on a crée manuellement après la création de la branche docker ci dessous
 fish-speech/
 │
 ├── Dockerfile[seb_test_s2]/    --> ce que l'on a crée manuellement après la création de la branche docker ci dessous
@@ -319,7 +319,7 @@ fish-speech/
 │
 ├── input/                      --> ce que l'on a crée manuellement après la création de la branche docker ci dessous
 ├── output/                     --> ce que l'on a crée manuellement après la création de la branche docker ci dessous
-├── checkpoints/                --> ce que l'on a crée manuellement après la création de la branche docker ci dessous
+├
 │
 ├── fish_speech/
 ├── tools/
@@ -359,7 +359,7 @@ python3 -m pip install --no-cache-dir --break-system-packages natsort
 python3 -m pip install --no-cache-dir --break-system-packages lightning
 python3 -m pip install --no-cache-dir --break-system-packages rich
 
-#modification du fichier gitignore
+#modification du fichier gitignore (ATTENTION CE GIT CONTIENT .GITIGNORE ET .DOCKERIGNORE ET CA PEUT ETRE ASSEZ TRICKY POUR NOUS..)
 
 # Audio Files
 # -----------
@@ -369,3 +369,169 @@ python3 -m pip install --no-cache-dir --break-system-packages rich
 !input/*.wav
 !output/
 !output/*.wav
+
+
+
+cd /app
+git clone -b docker https://github.com/seb2oo/fish-speech.git fish-speech
+cd /app/fish-speech
+python3 -m pip install --no-cache-dir --break-system-packages huggingface_hub
+cd /app
+mkdir -p checkpoints/s2-pro
+hf download fishaudio/s2-pro --local-dir /app/checkpoints/s2-pro
+mkdir -p /app/fish-speech/output
+apt-get update && apt-get install -y tree
+tree -L 3
+
+/app/
+├── fish-speech/
+│   ├── fish_speech/
+│   ├── input/
+│   │   └── fr.wav
+│   └── ...
+│
+└── checkpoints/
+    └── s2-pro/
+        ├── codec.pth
+        ├── model-00001-of-00002.safetensors
+        ├── model-00002-of-00002.safetensors
+        └── ...
+
+
+python3 -m pip install --no-cache-dir --break-system-packages descript-audiotools
+python3 -m pip install --no-cache-dir --break-system-packages descript-audio-codec
+
+python3 -m fish_speech.models.dac.inference \
+    -i "/app/fish-speech/input/fr.wav" \
+    -o "/app/fish-speech/output/reconstructed.wav" \
+    --checkpoint-path "/app/checkpoints/s2-pro/codec.pth" \
+    -d cuda
+
+fr.wav
+                      │
+                      ▼
+                ┌───────────┐
+                │    DAC    │
+                └─────┬─────┘
+                      │
+             ENCODAGE │
+                      ▼
+              reconstructed.npy
+                      │
+                codes audio
+                      │
+             DÉCODAGE  │
+                      ▼
+              reconstructed.wav
+
+
+python3 -m fish_speech.models.text2semantic.inference --help
+python3 -m pip install --no-cache-dir --break-system-packages "transformers<=4.57.3"
+python3 -m pip install --no-cache-dir --break-system-packages loralib
+
+python3 -m fish_speech.models.text2semantic.inference \
+    --text "Bonjour, ceci est un test avec ma voix clonée par Fish Speech S2-Pro." \
+    --prompt-text "Le rire d'un proche a le pouvoir d'effacer mes soucis. Il éclate comme une lumière claire et me remplit de joie. Dans ces instants, tout semble plus léger, et je retrouve confiance en l'avenir." \
+    --prompt-tokens "/app/fish-speech/output/reconstructed.npy" \
+    --checkpoint-path "/app/checkpoints/s2-pro" \
+    --device cuda \
+    --output "/app/fish-speech/output/test_clone.wav"
+
+                    ┌──────────────────┐
+                    │   fr.wav         │
+                    │   TA voix        │
+                    └────────┬─────────┘
+                             │
+                             ▼
+                          DAC
+                             │
+                             ▼
+                    reconstructed.npy
+                             │
+                             │
+        ┌────────────────────┴───────────────────┐
+        │                                        │
+   prompt-text                              nouveau texte
+        │                                        │
+        └──────────────────┬─────────────────────┘
+                           ▼
+                       S2-Pro
+                           │
+                           ▼
+                       codes_0.npy
+                           │
+                           ▼
+                          DAC
+                           │
+                           ▼
+                    test_clone.wav
+
+
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Keep local persistent test script
+!test_persistent.py
+
+
+"test_persistant.py" mais avec complile= False
+Charge bien les model en mémoire mais l'inférence prend toujours un certain temps : 
+~12–13 tok/s
+~5–7 s par génération courte
+
+
+# ceci et apparu après le test de "test_persistant.py" mais avec complile= True
+python3 -m pip install --no-cache-dir --break-system-packages click
+apt-get update && apt-get install -y libc6-dev
+apt-get update && apt-get install -y python3.12-dev
+
+     POD
+                     │
+             ┌───────┴───────┐
+             │               │
+          S2-Pro             DAC
+          VRAM               VRAM
+             │               │
+             └───────┬───────┘
+                     │
+              torch.compile
+                     │
+              1ère génération
+              ~239 s  ← compilation
+                     │
+              kernels compilés
+                     │
+          ┌──────────┼──────────┐
+          ↓          ↓          ↓
+       GEN #1      GEN #2      GEN #3
+                    2.14s       2.76s
+                  33 tok/s    34 tok/s
+
+
+grande amélioration :
+~33–34 tok/s
+~2–3 s par génération courte
+
+
+# ci dessous test pour mettre dans un nouveau "cache" tout ce qui concerne la génération de torch.compile
+mkdir -p /app/torchinductor-cache
+export TORCHINDUCTOR_CACHE_DIR=/app/torchinductor-cache
+python3 - <<'PY'
+import os
+from torch._inductor import codecache
+
+print("ENV:", os.environ.get("TORCHINDUCTOR_CACHE_DIR"))
+print("PyTorch cache:", codecache.cache_dir())
+PY
+find /app/torchinductor-cache -maxdepth 3 -type d | sort
+
+
+
+python3 -m http.server 8000 --bind 0.0.0.0
+
+cd /app/fish-speech
+git pull origin docker
+
+cd D:\Dev\06_FishSpeech\fish-speech

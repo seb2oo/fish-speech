@@ -80,7 +80,8 @@ Thumbs.db
 
 # Docker files (except the one being used)
 docker/
-Dockerfile*
+# Dockerfile*
+Dockerfile
 docker-compose*.yml
 .dockerignore
 
@@ -156,3 +157,5 @@ azure-pipelines.yml
 # /data_server/target
 # checkpoints
 # .venv
+
+
