@@ -47,6 +47,35 @@ PROMPT_TEXT = (
     "et je retrouve confiance en l'avenir."
 )
 
+# ============================================================
+# MEGA CACHE
+# ============================================================
+
+MEGACACHE_PATH = Path("/app/megacache.pt")
+
+if MEGACACHE_PATH.exists():
+    print("=" * 80)
+    print("LOADING MEGACACHE")
+    print("=" * 80)
+
+    t0 = time.perf_counter()
+
+    artifact_bytes = MEGACACHE_PATH.read_bytes()
+
+    cache_info = torch.compiler.load_cache_artifacts(
+        artifact_bytes
+    )
+
+    print(
+        f"[MEGACACHE] Loaded "
+        f"{len(artifact_bytes) / 1024 / 1024:.2f} MB "
+        f"in {time.perf_counter() - t0:.2f}s"
+    )
+
+    print(f"[MEGACACHE] INFO: {cache_info}")
+else:
+    print("[MEGACACHE] No cache file found")
+
 
 # ============================================================
 # LOAD MODELS
