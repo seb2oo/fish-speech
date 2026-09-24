@@ -33,7 +33,8 @@ PRECISION = torch.bfloat16
 # EXTENDED CACHE WARM-UP
 # ------------------------------------------------------------
 
-RUN_EXTENDED_TESTS = True
+RUN_EXTENDED_TESTS = False
+RUN_EXTENDED_TESTS_V2 = True
 
 # True = sauvegarde tous les WAV
 # False = fait les générations mais ne conserve pas les WAV
@@ -530,6 +531,505 @@ EXTENDED_TESTS = [
 
 ]
 
+# ============================================================
+# EXTENDED CACHE WARM-UP V2
+# ============================================================
+
+
+EXTENDED_TESTS_V2 = [
+
+    # ========================================================
+    # 01-10 : TRÈS COURTS / QUESTIONS
+    # ========================================================
+
+    (
+        "Oui ?",
+        "v2_01.wav",
+    ),
+
+    (
+        "Pourquoi ?",
+        "v2_02.wav",
+    ),
+
+    (
+        "Comment ça va ?",
+        "v2_03.wav",
+    ),
+
+    (
+        "Tu es là ?",
+        "v2_04.wav",
+    ),
+
+    (
+        "Quelle heure est-il ?",
+        "v2_05.wav",
+    ),
+
+    (
+        "Tout fonctionne ?",
+        "v2_06.wav",
+    ),
+
+    (
+        "On commence ?",
+        "v2_07.wav",
+    ),
+
+    (
+        "Est-ce vraiment nécessaire ?",
+        "v2_08.wav",
+    ),
+
+    (
+        "Peux-tu m'aider ?",
+        "v2_09.wav",
+    ),
+
+    (
+        "Qu'est-ce que tu proposes ?",
+        "v2_10.wav",
+    ),
+
+
+    # ========================================================
+    # 11-20 : COURTS / QUESTIONS
+    # ========================================================
+
+    (
+        "Pourquoi cette machine est-elle si rapide ?",
+        "v2_11.wav",
+    ),
+
+    (
+        "Comment fonctionne ce système exactement ?",
+        "v2_12.wav",
+    ),
+
+    (
+        "Est-ce que le modèle est correctement chargé ?",
+        "v2_13.wav",
+    ),
+
+    (
+        "Peux-tu répéter cette phrase, s'il te plaît ?",
+        "v2_14.wav",
+    ),
+
+    (
+        "Quelle solution devons-nous utiliser pour ce problème ?",
+        "v2_15.wav",
+    ),
+
+    (
+        "Pourquoi la première génération est-elle plus lente ?",
+        "v2_16.wav",
+    ),
+
+    (
+        "Combien de temps faut-il pour générer cette réponse ?",
+        "v2_17.wav",
+    ),
+
+    (
+        "Est-ce que cette voix ressemble à la voix de référence ?",
+        "v2_18.wav",
+    ),
+
+    (
+        "Peut-on utiliser ce système avec plusieurs langues ?",
+        "v2_19.wav",
+    ),
+
+    (
+        "Que se passe-t-il lorsque le texte devient beaucoup plus long ?",
+        "v2_20.wav",
+    ),
+
+
+    # ========================================================
+    # 21-30 : MOYENS / QUESTIONS
+    # ========================================================
+
+    (
+        "Pourquoi le temps de génération change-t-il lorsque la longueur "
+        "du texte augmente progressivement ?",
+        "v2_21.wav",
+    ),
+
+    (
+        "Comment pouvons-nous vérifier que les artefacts de compilation "
+        "sont correctement réutilisés par un nouveau processus ?",
+        "v2_22.wav",
+    ),
+
+    (
+        "Est-ce que le modèle peut conserver les caractéristiques de la "
+        "voix de référence lorsque nous changeons complètement le texte ?",
+        "v2_23.wav",
+    ),
+
+    (
+        "Quelle serait la meilleure manière de réduire le temps nécessaire "
+        "à la première génération après le démarrage d'un nouveau worker ?",
+        "v2_24.wav",
+    ),
+
+    (
+        "Pourquoi certaines générations semblent-elles nécessiter davantage "
+        "de compilation alors que les phrases précédentes étaient beaucoup plus rapides ?",
+        "v2_25.wav",
+    ),
+
+    (
+        "Peux-tu expliquer pourquoi un cache TorchInductor persistant peut "
+        "réduire le temps de compilation lors des exécutions suivantes ?",
+        "v2_26.wav",
+    ),
+
+    (
+        "Que faudrait-il changer dans cette architecture pour pouvoir servir "
+        "plusieurs utilisateurs simultanément sans augmenter fortement la latence ?",
+        "v2_27.wav",
+    ),
+
+    (
+        "Est-il possible d'obtenir une première génération rapide même après "
+        "le redémarrage complet du conteneur ?",
+        "v2_28.wav",
+    ),
+
+    (
+        "Comment le système réagit-il lorsqu'un utilisateur envoie une phrase "
+        "très courte immédiatement après une réponse extrêmement longue ?",
+        "v2_29.wav",
+    ),
+
+    (
+        "Pourquoi est-il important de tester plusieurs longueurs de séquences "
+        "plutôt que de générer plusieurs fois exactement la même phrase ?",
+        "v2_30.wav",
+    ),
+
+
+    # ========================================================
+    # 31-40 : LONGS / QUESTIONS
+    # ========================================================
+
+    (
+        "Si un utilisateur pose une question très longue contenant plusieurs "
+        "phrases, plusieurs virgules et plusieurs informations différentes, "
+        "est-ce que le modèle utilise exactement les mêmes artefacts de compilation "
+        "que lorsqu'il reçoit une question beaucoup plus courte ?",
+        "v2_31.wav",
+    ),
+
+    (
+        "Comment pouvons-nous déterminer expérimentalement si une nouvelle longueur "
+        "de séquence provoque réellement une nouvelle compilation, ou si TorchInductor "
+        "peut simplement réutiliser un artefact déjà présent dans son cache ?",
+        "v2_32.wav",
+    ),
+
+    (
+        "Si nous utilisons une voix de référence différente mais exactement le même "
+        "modèle, le même type de données et des textes de longueur comparable, "
+        "est-ce que les compilations précédemment réalisées peuvent être réutilisées ?",
+        "v2_33.wav",
+    ),
+
+    (
+        "Pourquoi une architecture de production utilisant plusieurs GPU différents "
+        "pourrait-elle rencontrer des temps de compilation différents alors que le "
+        "code Python et le modèle utilisés sont exactement les mêmes ?",
+        "v2_34.wav",
+    ),
+
+    (
+        "Est-ce qu'une application conversationnelle réelle rencontrera suffisamment "
+        "de longueurs de séquences différentes pour justifier un warm-up important "
+        "avant de commencer à accepter les requêtes des utilisateurs ?",
+        "v2_35.wav",
+    ),
+
+    (
+        "Que se passerait-il si nous envoyions successivement des réponses très courtes, "
+        "puis moyennes, puis longues, puis très longues, avant de redémarrer complètement "
+        "le processus afin de mesurer l'effet réel du cache persistant ?",
+        "v2_36.wav",
+    ),
+
+    (
+        "Comment faudrait-il organiser le cache si plusieurs workers utilisent le même "
+        "volume persistant mais ne possèdent pas nécessairement exactement le même GPU, "
+        "la même version de CUDA ou la même version de PyTorch ?",
+        "v2_37.wav",
+    ),
+
+    (
+        "Pourquoi une phrase contenant beaucoup de ponctuation, des nombres, des symboles "
+        "et des changements de structure peut-elle être intéressante pour tester le "
+        "comportement du compilateur dans une application de synthèse vocale ?",
+        "v2_38.wav",
+    ),
+
+    (
+        "Si nous voulons construire un assistant vocal multilingue capable de répondre "
+        "en français, en anglais, en espagnol et en allemand, quelles différences "
+        "de longueur et de structure devons-nous prendre en compte pendant le warm-up ?",
+        "v2_39.wav",
+    ),
+
+    (
+        "Peut-on considérer que le cache est suffisamment complet lorsque plusieurs "
+        "générations successives produisent très peu de nouveaux fichiers et que le "
+        "temps de première génération après redémarrage commence lui aussi à se stabiliser ?",
+        "v2_40.wav",
+    ),
+
+
+    # ========================================================
+    # 41-48 : PONCTUATION / NOMBRES / STRUCTURES
+    # ========================================================
+
+    (
+        "Test numéro 1 : 10, 20, 30, 40 et 50.",
+        "v2_41.wav",
+    ),
+
+    (
+        "Le résultat est-il de 98,5 %, 99 % ou 100 % ?",
+        "v2_42.wav",
+    ),
+
+    (
+        "Attention ! Est-ce vraiment terminé ? Oui !",
+        "v2_43.wav",
+    ),
+
+    (
+        "Voici une phrase avec des parenthèses (et quelques détails supplémentaires).",
+        "v2_44.wav",
+    ),
+
+    (
+        "Que signifie exactement cette expression : « intelligence artificielle » ?",
+        "v2_45.wav",
+    ),
+
+    (
+        "Première étape ; deuxième étape ; troisième étape : tout fonctionne.",
+        "v2_46.wav",
+    ),
+
+    (
+        "Un, deux, trois... Est-ce que tu m'entends encore ?",
+        "v2_47.wav",
+    ),
+
+    (
+        "Version 2.0 — test complet : CPU, GPU, CUDA 12.9, PyTorch 2.8.",
+        "v2_48.wav",
+    ),
+
+
+    # ========================================================
+    # 49-56 : ENGLISH
+    # ========================================================
+
+    (
+        "Hello, how are you today?",
+        "v2_49_en.wav",
+    ),
+
+    (
+        "Can you explain how this system works?",
+        "v2_50_en.wav",
+    ),
+
+    (
+        "Why does the first generation take so much longer than the next ones?",
+        "v2_51_en.wav",
+    ),
+
+    (
+        "How can we make the first inference faster after restarting the container?",
+        "v2_52_en.wav",
+    ),
+
+    (
+        "What happens when the input sequence becomes much longer than expected?",
+        "v2_53_en.wav",
+    ),
+
+    (
+        "Could a persistent TorchInductor cache significantly reduce compilation time "
+        "for a production text-to-speech service?",
+        "v2_54_en.wav",
+    ),
+
+    (
+        "If several workers share the same persistent cache but run on different GPU "
+        "architectures, will all compiled artifacts remain reusable?",
+        "v2_55_en.wav",
+    ),
+
+    (
+        "How should we design the warm-up process if users can send short questions, "
+        "long answers, paragraphs, and multilingual conversations?",
+        "v2_56_en.wav",
+    ),
+
+
+    # ========================================================
+    # 57-64 : ESPAÑOL
+    # ========================================================
+
+    (
+        "Hola, ¿cómo estás hoy?",
+        "v2_57_es.wav",
+    ),
+
+    (
+        "¿Puedes explicarme cómo funciona este sistema?",
+        "v2_58_es.wav",
+    ),
+
+    (
+        "¿Por qué la primera generación tarda tanto tiempo?",
+        "v2_59_es.wav",
+    ),
+
+    (
+        "¿Cómo podemos reducir el tiempo de compilación después de reiniciar el contenedor?",
+        "v2_60_es.wav",
+    ),
+
+    (
+        "¿Qué ocurre cuando el texto de entrada es mucho más largo de lo habitual?",
+        "v2_61_es.wav",
+    ),
+
+    (
+        "¿Puede una caché persistente reducir significativamente el tiempo necesario "
+        "para generar la primera respuesta de voz?",
+        "v2_62_es.wav",
+    ),
+
+    (
+        "Si varios trabajadores utilizan la misma caché persistente pero diferentes "
+        "GPU, ¿los artefactos compilados pueden reutilizarse de la misma manera?",
+        "v2_63_es.wav",
+    ),
+
+    (
+        "¿Cómo deberíamos preparar el sistema si queremos responder rápidamente a "
+        "preguntas cortas y también a respuestas largas en varios idiomas?",
+        "v2_64_es.wav",
+    ),
+
+
+    # ========================================================
+    # 65-72 : DEUTSCH
+    # ========================================================
+
+    (
+        "Hallo, wie geht es dir heute?",
+        "v2_65_de.wav",
+    ),
+
+    (
+        "Kannst du erklären, wie dieses System funktioniert?",
+        "v2_66_de.wav",
+    ),
+
+    (
+        "Warum dauert die erste Generierung so lange?",
+        "v2_67_de.wav",
+    ),
+
+    (
+        "Wie können wir die Kompilierungszeit nach einem Neustart reduzieren?",
+        "v2_68_de.wav",
+    ),
+
+    (
+        "Was passiert, wenn der eingegebene Text viel länger als erwartet ist?",
+        "v2_69_de.wav",
+    ),
+
+    (
+        "Kann ein persistenter Cache die Zeit für die erste Sprachgenerierung "
+        "deutlich reduzieren?",
+        "v2_70_de.wav",
+    ),
+
+    (
+        "Wenn mehrere Worker denselben persistenten Cache verwenden, aber auf "
+        "unterschiedlichen GPUs laufen, können die kompilierten Artefakte weiterhin "
+        "verwendet werden?",
+        "v2_71_de.wav",
+    ),
+
+    (
+        "Wie sollten wir den Warm-up-Prozess gestalten, wenn Benutzer kurze Fragen, "
+        "lange Antworten und mehrsprachige Gespräche senden können?",
+        "v2_72_de.wav",
+    ),
+
+
+    # ========================================================
+    # 73-80 : TRÈS LONGS
+    # ========================================================
+
+    (
+        "Voici un texte particulièrement long destiné à provoquer une séquence "
+        "beaucoup plus importante que les précédentes. Dans une application réelle, "
+        "un assistant vocal peut recevoir une demande contenant plusieurs paragraphes, "
+        "des explications détaillées, des questions successives et de nombreuses "
+        "informations contextuelles. Nous voulons donc également tester ce type de "
+        "situation afin de déterminer si de nouveaux artefacts TorchInductor sont "
+        "créés lorsque la longueur de la séquence augmente fortement.",
+        "v2_73_very_long.wav",
+    ),
+
+    (
+        "Imaginons maintenant une conversation complète entre un utilisateur et un "
+        "assistant vocal. L'utilisateur commence par poser une question très courte. "
+        "L'assistant répond ensuite avec quelques phrases. L'utilisateur demande alors "
+        "davantage de détails et reçoit une réponse beaucoup plus longue. Enfin, il pose "
+        "une dernière question contenant plusieurs informations différentes. Cette "
+        "situation est intéressante pour notre test parce qu'elle reproduit davantage "
+        "le comportement d'une véritable application conversationnelle et permet de "
+        "faire varier progressivement la longueur des séquences traitées par le modèle.",
+        "v2_74_very_long.wav",
+    ),
+
+    (
+        "Nous allons terminer cette série avec une génération volontairement très longue. "
+        "Le contenu exact du texte est moins important que sa structure et sa longueur. "
+        "Nous cherchons principalement à rencontrer des séquences qui n'ont pas encore "
+        "été utilisées pendant les générations précédentes. Si TorchInductor doit créer "
+        "de nouveaux artefacts pour certaines de ces dimensions, ils seront enregistrés "
+        "dans le cache persistant. Après cette génération, nous pourrons comparer la taille "
+        "du cache avec les valeurs précédentes et déterminer si nous sommes réellement "
+        "arrivés à un plateau ou si certaines formes de calcul restent encore à explorer.",
+        "v2_75_very_long.wav",
+    ),
+
+    (
+        "Dernière question de cette série : si nous avons déjà généré des centaines de "
+        "séquences différentes, avec plusieurs longueurs, plusieurs langues, différentes "
+        "ponctuations et plusieurs structures de texte, mais que la première génération "
+        "après le redémarrage reste encore relativement lente, cela signifie-t-il que "
+        "le cache est incomplet, ou bien qu'une partie du temps observé correspond à "
+        "des opérations qui ne peuvent tout simplement pas être supprimées, comme "
+        "l'initialisation du modèle, le chargement du codec, la préparation du GPU ou "
+        "certaines compilations dépendantes de l'architecture matérielle ?",
+        "v2_76_final.wav",
+    ),
+]
 
 # ============================================================
 # RUN BASIC TESTS
@@ -585,6 +1085,45 @@ else:
     print()
     print("=" * 80)
     print("EXTENDED TESTS DISABLED")
+    print("=" * 80)
+
+# ============================================================
+# RUN EXTENDED TESTS V2
+# ============================================================
+
+if RUN_EXTENDED_TESTS_V2:
+
+    print()
+    print("=" * 80)
+    print("RUNNING EXTENDED CACHE WARM-UP V2")
+    print("=" * 80)
+
+    print(
+        f"Number of V2 generations: "
+        f"{len(EXTENDED_TESTS_V2)}"
+    )
+
+    for index, (text, filename) in enumerate(
+        EXTENDED_TESTS_V2,
+        start=1,
+    ):
+
+        print()
+        print(
+            f"EXTENDED V2 TEST "
+            f"{index}/{len(EXTENDED_TESTS_V2)}"
+        )
+
+        generate_voice(
+            text,
+            OUTPUT_DIR / filename,
+        )
+
+else:
+
+    print()
+    print("=" * 80)
+    print("EXTENDED V2 TESTS DISABLED")
     print("=" * 80)
 
 
