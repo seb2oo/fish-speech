@@ -466,13 +466,13 @@ def init_model(checkpoint_path, device, precision, compile=False):
             dynamic=True,
         )
 
-        model.forward_generate_fast = torch.compile(
-            model.forward_generate_fast,
-            backend=compile_backend,
-            mode=compile_mode,
-            fullgraph=True,
-            dynamic=True,
-        )
+        # model.forward_generate_fast = torch.compile(
+        #     model.forward_generate_fast,
+        #     backend=compile_backend,
+        #     mode=compile_mode,
+        #     fullgraph=True,
+        #     dynamic=True,
+        # )
 
         decode_one_token = decode_one_token_ar
     #new end
