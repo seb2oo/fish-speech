@@ -25,7 +25,7 @@ from fish_speech.conversation import Conversation, Message
 from fish_speech.tokenizer import IM_END_TOKEN
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-torch._inductor.config.coordinate_descent_tuning = False
+torch._inductor.config.coordinate_descent_tuning = True
 torch._inductor.config.triton.unique_kernel_names = True
 
 if hasattr(torch._inductor.config, "fx_graph_cache"):
@@ -787,11 +787,41 @@ def generate_long(
                 top_k=top_k,
             )
 
+            # if sample_idx == 0 and batch_idx == 0 and compile:
+            #     logger.info(f"Compilation time: {time.perf_counter() - t0:.2f} seconds")
+
+            # if torch.cuda.is_available():
+            #     torch.cuda.synchronize()
+
+            # new start
             if sample_idx == 0 and batch_idx == 0 and compile:
                 logger.info(f"Compilation time: {time.perf_counter() - t0:.2f} seconds")
 
+                # Save PyTorch Mega-Cache after the first compilation
+                try:
+                    artifacts = torch.compiler.save_cache_artifacts()
+
+                    if artifacts is not None:
+                        artifact_bytes, cache_info = artifacts
+
+                        cache_path = "/app/megacache.pt"
+                        with open(cache_path, "wb") as f:
+                            f.write(artifact_bytes)
+
+                        logger.info(
+                            f"[MEGACACHE] Saved {len(artifact_bytes) / 1024 / 1024:.2f} MB "
+                            f"to {cache_path}"
+                        )
+                        logger.info(f"[MEGACACHE] Info: {cache_info}")
+                    else:
+                        logger.warning("[MEGACACHE] No artifacts returned!")
+
+                except Exception:
+                    logger.exception("[MEGACACHE] Failed to save cache artifacts")
+
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
+            #new end
 
             t_batch = time.perf_counter() - t0
             tokens_generated = y.size(1) - prompt_length
