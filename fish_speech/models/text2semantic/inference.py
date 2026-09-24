@@ -298,14 +298,26 @@ def generate(
     ).dtype  # model weight dtype (bfloat16), NOT prompt dtype (int32)
 
     # Critical fix: Only set up cache on first run or when necessary
+    # if not hasattr(model, "_cache_setup_done") or not model._cache_setup_done:
+    #     with torch.device(device):
+    #         model.setup_caches(
+    #             max_batch_size=1,  # Fixed to 1, avoid dynamic changes
+    #             max_seq_len=model.config.max_seq_len,
+    #             dtype=next(model.parameters()).dtype,
+    #         )
+    #     model._cache_setup_done = True
+
+    t_cache = time.perf_counter()
     if not hasattr(model, "_cache_setup_done") or not model._cache_setup_done:
         with torch.device(device):
             model.setup_caches(
-                max_batch_size=1,  # Fixed to 1, avoid dynamic changes
+                max_batch_size=1,
                 max_seq_len=model.config.max_seq_len,
                 dtype=next(model.parameters()).dtype,
             )
         model._cache_setup_done = True
+    torch.cuda.synchronize()
+    logger.info(f"[PROFILE] setup_caches: {time.perf_counter() - t_cache:.3f}s")
 
     codebook_dim = 1 + model.config.num_codebooks
 
@@ -340,6 +352,10 @@ def generate(
 
     prefill_decode = decode_one_token_ar
 
+    torch.cuda.synchronize()
+    t_first = time.perf_counter()
+
+
     # prefill_decode = decode_one_token
 
     first_token = prefill_decode(
@@ -354,11 +370,15 @@ def generate(
         audio_parts,
         kv_len=T,
     ).clone()
+    torch.cuda.synchronize()
+    logger.info(f"[PROFILE] first_token: {time.perf_counter() - t_first:.3f}s")
     seq[:, T : T + 1] = first_token
 
     # Recreate input_pos
     input_pos = torch.tensor([T], device=device, dtype=torch.int)
 
+    torch.cuda.synchronize()
+    t_decode = time.perf_counter()
     x = decode_n_tokens(
         model,
         first_token.view(1, codebook_dim, -1),
@@ -374,6 +394,8 @@ def generate(
         kv_start_pos=T,
     )
     seq = seq[:, : T + 1 + x.size(1)]
+    torch.cuda.synchronize()
+    logger.info(f"[PROFILE] decode_n_tokens: {time.perf_counter() - t_decode:.3f}s")
     seq[:, T + 1 :] = x
 
     # Clean up temporary variables
