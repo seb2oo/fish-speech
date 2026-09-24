@@ -25,7 +25,7 @@ from fish_speech.conversation import Conversation, Message
 from fish_speech.tokenizer import IM_END_TOKEN
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-torch._inductor.config.coordinate_descent_tuning = True
+torch._inductor.config.coordinate_descent_tuning = False
 torch._inductor.config.triton.unique_kernel_names = True
 
 if hasattr(torch._inductor.config, "fx_graph_cache"):
@@ -446,7 +446,7 @@ def init_model(checkpoint_path, device, precision, compile=False):
         decode_one_token = torch.compile(
             decode_one_token,
             backend="inductor" if torch.cuda.is_available() else "aot_eager",
-            mode="reduce-overhead" if torch.cuda.is_available() else None,
+            mode="default" if torch.cuda.is_available() else None,
             fullgraph=True,
             dynamic=True,
         )
