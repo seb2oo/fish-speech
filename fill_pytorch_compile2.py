@@ -244,7 +244,7 @@ def generate_voice(text: str, output_path: Path):
         top_k=30,
         repetition_penalty=1.1,
         temperature=1.0,
-        compile=False,
+        compile=True,
         iterative_prompt=True,
         chunk_length=512,
         prompt_text=[PROMPT_TEXT],
