@@ -1,8 +1,11 @@
+
 #!/usr/bin/env python3
 
 from pathlib import Path
 import py_compile
+import shutil
 import sys
+from datetime import datetime
 
 
 TRITON_HEURISTICS = Path(
@@ -14,51 +17,177 @@ COORDESC_TUNER = Path(
 )
 
 
+# ============================================================
+# HELPERS
+# ============================================================
+
 def fail(message):
-    print(f"\n[ERROR] {message}")
+    print()
+    print("=" * 70)
+    print("[ERROR]")
+    print("=" * 70)
+    print(message)
     sys.exit(1)
 
 
+def backup_file(path):
+    """
+    Create exactly one backup before modifying a file.
+
+    If the backup already exists, do not overwrite it.
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup = path.with_name(
+        f"{path.name}.backup_{timestamp}"
+    )
+
+    try:
+        shutil.copy2(path, backup)
+    except Exception as e:
+        fail(
+            f"Impossible de sauvegarder:\n"
+            f"  {path}\n"
+            f"Erreur: {e}"
+        )
+
+    print(f"[BACKUP] {path}")
+    print(f"         -> {backup}")
+
+    return backup
+
+
 def replace_once(source, old, new, description):
-    count = source.count(old)
+    """
+    Idempotent replacement.
 
-    if count == 0:
-        if new in source:
-            print(f"[OK] Already patched: {description}")
-            return source
+    - If old exists exactly once: replace it.
+    - If new already exists and old doesn't: consider patched.
+    - Otherwise: fail.
+    """
+    old_count = source.count(old)
+    new_count = source.count(new)
 
+    if old_count == 1:
+        print(f"[PATCH] {description}")
+        return source.replace(old, new, 1)
+
+    if old_count == 0 and new_count >= 1:
+        print(f"[OK] Already patched: {description}")
+        return source
+
+    if old_count > 1:
         fail(
-            f"Cannot find expected code for:\n"
-            f"  {description}"
-        )
-
-    if count != 1:
-        fail(
-            f"Expected exactly 1 occurrence for:\n"
+            f"Plusieurs occurrences inattendues pour:\n"
             f"  {description}\n"
-            f"Found: {count}"
+            f"Occurrences: {old_count}"
         )
 
-    print(f"[PATCH] {description}")
-    return source.replace(old, new, 1)
+    fail(
+        f"Impossible de trouver le code attendu pour:\n"
+        f"  {description}"
+    )
+
+
+def get_function_block(source, function_marker):
+    """
+    Return:
+
+        start
+        end
+        function_block
+
+    for a top-level class method/function with 4-space indentation.
+    """
+    start = source.find(function_marker)
+
+    if start == -1:
+        return None
+
+    next_method = source.find(
+        "\n    def ",
+        start + len(function_marker),
+    )
+
+    if next_method == -1:
+        end = len(source)
+    else:
+        end = next_method
+
+    return start, end, source[start:end]
 
 
 # ============================================================
-# TRITON HEURISTICS
+# CHECK FILES
 # ============================================================
 
+print("=" * 70)
+print("PYTORCH MEGACACHE PATCH")
+print("=" * 70)
+
+print()
+print("Checking files...")
+
+if not TRITON_HEURISTICS.exists():
+    fail(
+        f"Fichier introuvable:\n"
+        f"  {TRITON_HEURISTICS}"
+    )
+
+if not COORDESC_TUNER.exists():
+    fail(
+        f"Fichier introuvable:\n"
+        f"  {COORDESC_TUNER}"
+    )
+
+print("[OK] triton_heuristics.py found")
+print("[OK] coordinate_descent_tuner.py found")
+
+
+# ============================================================
+# READ ORIGINAL FILES
+# ============================================================
+
+triton_original = TRITON_HEURISTICS.read_text()
+coordesc_original = COORDESC_TUNER.read_text()
+
+
+# ============================================================
+# BACKUPS
+# ============================================================
+
+print()
+print("=" * 70)
+print("BACKUPS")
+print("=" * 70)
+
+backup_file(TRITON_HEURISTICS)
+backup_file(COORDESC_TUNER)
+
+
+# ============================================================
+# PATCH 1/2 — TRITON HEURISTICS
+# ============================================================
+
+print()
 print("=" * 70)
 print("PATCH 1/2 — triton_heuristics.py")
 print("=" * 70)
 
-if not TRITON_HEURISTICS.exists():
-    fail(f"File not found: {TRITON_HEURISTICS}")
-
-s = TRITON_HEURISTICS.read_text()
+s = triton_original
 
 
 # ------------------------------------------------------------
-# 1. cached_configs condition
+# PATCH A
+#
+# Original:
+#
+#     if len(cached_configs) == 1 and len(configs) > 1:
+#
+# New:
+#
+#     if len(cached_configs) == 1:
+#
+# This allows a cached single configuration to be reused.
 # ------------------------------------------------------------
 
 s = replace_once(
@@ -70,88 +199,128 @@ s = replace_once(
 
 
 # ------------------------------------------------------------
-# 2. found_by_coordesc
+# PATCH B
+#
+# When the cached configuration matches an already compiled
+# compile_result, mark it as found_by_coordesc.
+#
+# This prevents the later coordinate-descent benchmark storm.
 # ------------------------------------------------------------
 
-old = """                if triton_config_to_hashable(compile_result.config) == best_config_hash:
+old_matching_block = """                if triton_config_to_hashable(compile_result.config) == best_config_hash:
                     self.compile_results = [compile_result]
                     return"""
 
-new = """                if triton_config_to_hashable(compile_result.config) == best_config_hash:
+new_matching_block = """                if triton_config_to_hashable(compile_result.config) == best_config_hash:
                     compile_result.config.found_by_coordesc = True
                     self.compile_results = [compile_result]
                     return"""
 
 s = replace_once(
     s,
-    old,
-    new,
-    "mark cached config as found_by_coordesc=True",
+    old_matching_block,
+    new_matching_block,
+    "mark cached matching config as found_by_coordesc=True",
 )
 
 
 # ------------------------------------------------------------
-# 3. RECHECK diagnostic
+# PATCH C
 #
-# We locate the FUNCTION itself, not a generic marker.
+# Add RECHECK diagnostic INSIDE recheck_autotune_cache().
+#
+# IMPORTANT:
+# We deliberately search inside the function block.
+# We never perform a global replacement.
 # ------------------------------------------------------------
 
-TRACE = (
+recheck_marker = "    def recheck_autotune_cache("
+
+result = get_function_block(
+    s,
+    recheck_marker,
+)
+
+if result is None:
+    fail(
+        "Impossible de trouver recheck_autotune_cache()."
+    )
+
+recheck_start, recheck_end, recheck_block = result
+
+trace_line = (
     '        print(f"[RECHECK] name={self.fn.__name__} '
     'configs={len(configs)} cached={len(cached_configs)}", flush=True)'
 )
 
-if TRACE in s:
-    print("[OK] Already patched: RECHECK diagnostic")
-else:
+autotune_info_marker = (
+    "        self.autotune_cache_info = autotune_cache_info"
+)
 
-    func_marker = "    def recheck_autotune_cache("
 
-    start = s.find(func_marker)
+# Remove any existing RECHECK lines INSIDE the function first.
+# This makes the operation idempotent and guarantees exactly one.
+lines = recheck_block.splitlines()
 
-    if start == -1:
-        fail(
-            "Cannot find recheck_autotune_cache() in "
-            "triton_heuristics.py"
-        )
+clean_lines = [
+    line
+    for line in lines
+    if "[RECHECK] name={self.fn.__name__}" not in line
+]
 
-    # Find the beginning of the next method.
-    next_method = s.find("\n    def ", start + len(func_marker))
+clean_recheck_block = "\n".join(clean_lines)
 
-    if next_method == -1:
-        function_block = s[start:]
-    else:
-        function_block = s[start:next_method]
+if recheck_block.endswith("\n"):
+    clean_recheck_block += "\n"
 
-    marker = "        self.autotune_cache_info = autotune_cache_info"
 
-    if marker not in function_block:
-        fail(
-            "Found recheck_autotune_cache(), but could not find "
-            "self.autotune_cache_info inside that function."
-        )
+# The diagnostic must have exactly one insertion point.
+count = clean_recheck_block.count(
+    autotune_info_marker
+)
 
-    if function_block.count(marker) != 1:
-        fail(
-            "Unexpected number of autotune_cache_info markers "
-            "inside recheck_autotune_cache()."
-        )
-
-    function_block = function_block.replace(
-        marker,
-        marker + "\n" + TRACE,
-        1,
+if count != 1:
+    fail(
+        "Dans recheck_autotune_cache(), le marqueur\n"
+        "  self.autotune_cache_info = autotune_cache_info\n"
+        f"n'apparaît pas exactement une fois.\n"
+        f"Occurrences: {count}"
     )
 
-    s = s[:start] + function_block + s[next_method:]
-    print("[PATCH] Added RECHECK diagnostic inside recheck_autotune_cache()")
+
+# Insert immediately after autotune_cache_info assignment.
+clean_recheck_block = clean_recheck_block.replace(
+    autotune_info_marker,
+    autotune_info_marker + "\n" + trace_line,
+    1,
+)
 
 
-TRITON_HEURISTICS.write_text(s)
+s = (
+    s[:recheck_start]
+    + clean_recheck_block
+    + s[recheck_end:]
+)
+
+print(
+    "[PATCH] RECHECK diagnostic placed inside "
+    "recheck_autotune_cache()"
+)
 
 
 # ============================================================
-# COORDINATE DESCENT TUNER
+# WRITE TRITON HEURISTICS
+# ============================================================
+
+if s != triton_original:
+    TRITON_HEURISTICS.write_text(s)
+    print("[OK] triton_heuristics.py written")
+else:
+    print("[OK] triton_heuristics.py unchanged")
+
+
+# ============================================================
+# PATCH 2/2 — COORDINATE DESCENT TUNER
 # ============================================================
 
 print()
@@ -159,59 +328,86 @@ print("=" * 70)
 print("PATCH 2/2 — coordinate_descent_tuner.py")
 print("=" * 70)
 
-if not COORDESC_TUNER.exists():
-    fail(f"File not found: {COORDESC_TUNER}")
+s = coordesc_original
 
-s = COORDESC_TUNER.read_text()
 
+# ------------------------------------------------------------
+# PATCH D
+# ------------------------------------------------------------
 
 s = replace_once(
     s,
     """        found = self.lookup_in_cache(config)""",
-
     """        found = self.lookup_in_cache(config)
-        print(f"[AUTO-TRACE-CALLFUNC] LOOKUP name={self.name}", flush=True)""",
-
+        print(
+            f"[AUTO-TRACE-CALLFUNC] LOOKUP name={self.name}",
+            flush=True,
+        )""",
     "trace coordinate descent cache lookup",
 )
 
 
+# ------------------------------------------------------------
+# PATCH E
+# ------------------------------------------------------------
+
 s = replace_once(
     s,
     """        if found is not None:
             log.debug""",
-
     """        if found is not None:
-            print(f"[AUTO-TRACE-CALLFUNC] CACHED name={self.name} timing={found:.6f}", flush=True)
+            print(
+                f"[AUTO-TRACE-CALLFUNC] CACHED "
+                f"name={self.name} timing={found:.6f}",
+                flush=True,
+            )
             log.debug""",
-
     "trace cached benchmark result",
 )
 
 
+# ------------------------------------------------------------
+# PATCH F
+# ------------------------------------------------------------
+
 s = replace_once(
     s,
     """        timing = func(config)""",
-
-    """        print(f"[AUTO-TRACE-CALLFUNC] BENCHMARK name={self.name}", flush=True)
+    """        print(
+            f"[AUTO-TRACE-CALLFUNC] BENCHMARK name={self.name}",
+            flush=True,
+        )
         timing = func(config)""",
-
     "trace actual benchmark",
 )
 
 
+# ------------------------------------------------------------
+# PATCH G
+# ------------------------------------------------------------
+
 s = replace_once(
     s,
     """        self.cache_benchmark_result(config, timing)""",
-
-    """        print(f"[AUTO-TRACE-CALLFUNC] RESULT name={self.name} timing={timing:.6f}", flush=True)
+    """        print(
+            f"[AUTO-TRACE-CALLFUNC] RESULT "
+            f"name={self.name} timing={timing:.6f}",
+            flush=True,
+        )
         self.cache_benchmark_result(config, timing)""",
-
     "trace benchmark result",
 )
 
 
-COORDESC_TUNER.write_text(s)
+# ============================================================
+# WRITE COORDESC
+# ============================================================
+
+if s != coordesc_original:
+    COORDESC_TUNER.write_text(s)
+    print("[OK] coordinate_descent_tuner.py written")
+else:
+    print("[OK] coordinate_descent_tuner.py unchanged")
 
 
 # ============================================================
@@ -228,79 +424,119 @@ coordesc = COORDESC_TUNER.read_text()
 
 
 # ------------------------------------------------------------
-# Required patches
+# Verify cached config condition
 # ------------------------------------------------------------
 
 if "if len(cached_configs) == 1:" not in triton:
-    fail("cached_configs patch missing")
+    fail(
+        "Patch cached_configs == 1 absente."
+    )
 
-if "compile_result.config.found_by_coordesc = True" not in triton:
-    fail("found_by_coordesc=True patch missing")
-
-if TRACE not in triton:
-    fail("RECHECK diagnostic missing")
-
-
-# ------------------------------------------------------------
-# CRITICAL CHECK:
-# RECHECK must be inside recheck_autotune_cache()
-# and NOT inside __init__()
-# ------------------------------------------------------------
-
-recheck_start = triton.find(
-    "    def recheck_autotune_cache("
+print(
+    "[VERIFY] cached_configs condition       OK"
 )
 
-trace_pos = triton.find(
+
+# ------------------------------------------------------------
+# Verify found_by_coordesc
+# ------------------------------------------------------------
+
+if (
+    "compile_result.config.found_by_coordesc = True"
+    not in triton
+):
+    fail(
+        "Patch found_by_coordesc=True absente."
+    )
+
+print(
+    "[VERIFY] found_by_coordesc=True         OK"
+)
+
+
+# ------------------------------------------------------------
+# Verify recheck function
+# ------------------------------------------------------------
+
+result = get_function_block(
+    triton,
+    recheck_marker,
+)
+
+if result is None:
+    fail(
+        "recheck_autotune_cache() introuvable "
+        "pendant la vérification."
+    )
+
+recheck_start, recheck_end, recheck_block = result
+
+
+trace_count = recheck_block.count(
     '[RECHECK] name={self.fn.__name__}'
 )
 
-if recheck_start == -1:
-    fail("recheck_autotune_cache() not found")
-
-if trace_pos == -1:
-    fail("RECHECK diagnostic not found")
-
-next_method = triton.find(
-    "\n    def ",
-    recheck_start + len("    def recheck_autotune_cache("),
-)
-
-if next_method == -1:
-    next_method = len(triton)
-
-if not (
-    recheck_start < trace_pos < next_method
-):
+if trace_count != 1:
     fail(
-        "RECHECK diagnostic is NOT inside "
-        "recheck_autotune_cache()"
+        "Le diagnostic RECHECK doit apparaître "
+        "exactement une fois dans recheck_autotune_cache().\n"
+        f"Occurrences trouvées: {trace_count}"
     )
 
+print(
+    "[VERIFY] RECHECK diagnostic             OK"
+)
+print(
+    "[VERIFY] RECHECK location               OK"
+)
+
 
 # ------------------------------------------------------------
-# Coordinate descent diagnostics
+# IMPORTANT:
+# Make sure there is NO RECHECK diagnostic outside the function.
 # ------------------------------------------------------------
 
-for marker in [
+outside_before = triton[:recheck_start]
+outside_after = triton[recheck_end:]
+
+outside = outside_before + outside_after
+
+if "[RECHECK] name={self.fn.__name__}" in outside:
+    fail(
+        "Un ancien diagnostic RECHECK existe encore "
+        "en dehors de recheck_autotune_cache()."
+    )
+
+print(
+    "[VERIFY] no RECHECK diagnostic outside   OK"
+)
+
+
+# ------------------------------------------------------------
+# Verify coordinate descent diagnostics
+# ------------------------------------------------------------
+
+required_coordesc_markers = [
     "[AUTO-TRACE-CALLFUNC] LOOKUP",
     "[AUTO-TRACE-CALLFUNC] CACHED",
     "[AUTO-TRACE-CALLFUNC] BENCHMARK",
     "[AUTO-TRACE-CALLFUNC] RESULT",
-]:
+]
+
+for marker in required_coordesc_markers:
     if marker not in coordesc:
-        fail(f"Missing diagnostic: {marker}")
+        fail(
+            f"Diagnostic manquant:\n"
+            f"  {marker}"
+        )
 
-
-print("[VERIFY] cached_configs condition       OK")
-print("[VERIFY] found_by_coordesc=True         OK")
-print("[VERIFY] RECHECK diagnostic             OK")
-print("[VERIFY] RECHECK location               OK")
-print("[VERIFY] coordinate descent diagnostics OK")
+print(
+    "[VERIFY] coordinate descent diagnostics OK"
+)
 
 
 # ============================================================
-# PYTHON COMPILE CHECK
+# PYTHON SYNTAX CHECK
 # ============================================================
 
 print()
@@ -320,11 +556,17 @@ try:
     )
 
 except Exception as e:
-    fail(f"Python syntax check failed:\n{e}")
+    fail(
+        f"Python syntax check failed:\n{e}"
+    )
 
+print(
+    "[CHECK] triton_heuristics.py        OK"
+)
 
-print("[CHECK] triton_heuristics.py        OK")
-print("[CHECK] coordinate_descent_tuner.py OK")
+print(
+    "[CHECK] coordinate_descent_tuner.py OK"
+)
 
 
 # ============================================================
@@ -335,3 +577,8 @@ print()
 print("=" * 70)
 print("PATCH OK")
 print("=" * 70)
+print()
+print("Les deux fichiers PyTorch ont été patchés et vérifiés.")
+print("Les backups ont été créés avant modification.")
+print()
+
