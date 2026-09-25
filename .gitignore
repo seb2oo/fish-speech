@@ -46,6 +46,7 @@ MANIFEST
 
 # Keep local persistent test script
 !test_persistent.py
+!patch_pytorch_megacache.py
 
 # Virtual Environments
 # --------------------
