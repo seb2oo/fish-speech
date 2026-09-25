@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal, Optional, Tuple, Union
 
+from torch._dynamo.utils import counters
+
 import click
 import numpy as np
 import torch
@@ -246,6 +248,9 @@ def decode_n_tokens(
 
             t_compile = time.perf_counter()
 
+            # Snapshot des compteurs Inductor avant le premier appel
+            counters_before = dict(counters["inductor"])
+
             gpu_start = torch.cuda.Event(enable_timing=True)
             gpu_end = torch.cuda.Event(enable_timing=True)
 
@@ -257,7 +262,6 @@ def decode_n_tokens(
         if i == 0:
             gpu_end.record()
 
-            # Attend la fin réelle du travail GPU
             torch.cuda.synchronize()
 
             cpu_time = time.perf_counter() - t_compile
@@ -269,6 +273,17 @@ def decode_n_tokens(
             logger.info(
                 f"[PROFILE] first compiled decode_one_token GPU: {gpu_time:.3f}s"
             )
+
+            # Affiche uniquement les compteurs qui ont changé
+            counters_after = dict(counters["inductor"])
+
+            changed = {}
+            for key, value in counters_after.items():
+                before = counters_before.get(key, 0)
+                if value != before:
+                    changed[key] = (before, value)
+
+            logger.info(f"[INDUCTOR COUNTERS] {changed}")
         # new end
 
         input_pos += 1
