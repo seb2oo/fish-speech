@@ -14,6 +14,10 @@ from fish_speech.models.text2semantic.inference import (
 )
 
 
+create_mega_cache = False
+use_torch_inductor_cache = True
+
+
 # ============================================================
 # CONFIG
 # ============================================================
@@ -94,7 +98,7 @@ model, decode_one_token = init_model(
     checkpoint_path=str(CHECKPOINT),
     device=DEVICE,
     precision=PRECISION,
-    compile=True,
+    compile=use_torch_inductor_cache,
 )
 
 torch.cuda.synchronize()
@@ -244,7 +248,7 @@ def generate_voice(text: str, output_path: Path):
         top_k=30,
         repetition_penalty=1.1,
         temperature=1.0,
-        compile=False,
+        compile=create_mega_cache,
         iterative_prompt=True,
         chunk_length=512,
         prompt_text=[PROMPT_TEXT],
