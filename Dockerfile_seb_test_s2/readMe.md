@@ -535,3 +535,81 @@ cd /app/fish-speech
 git pull origin docker
 
 cd D:\Dev\06_FishSpeech\fish-speech
+
+************
+************
+
+PS : avec conteneur actuel : , il faut reinstaller ceci car je n'ai pas utiliser un aute conteneur, ca prend trop de temps ... :
+python3 -m pip install --no-cache-dir --break-system-packages click
+apt-get update
+apt-get install -y libc6-dev
+apt-get update
+apt-get install -y python3.12-dev
+
+cd /app
+git clone -b docker https://github.com/seb2oo/fish-speech.git fish-speech
+cd /app/fish-speech
+python3 -m pip install --no-cache-dir --break-system-packages huggingface_hub
+cd /app
+mkdir -p checkpoints/s2-pro
+hf download fishaudio/s2-pro --local-dir /app/checkpoints/s2-pro
+mkdir -p /app/fish-speech/output
+apt-get update && apt-get install -y tree
+tree -L 3
+
+# creation du cache "standard"
+mkdir -p /app/torchinductor-cache && export TORCHINDUCTOR_CACHE_DIR=/app/torchinductor-cache
+python3 -c "import os; from torch._inductor import codecache; print('ENV:',os.environ.get('TORCHINDUCTOR_CACHE_DIR')); print('PyTorch cache:',codecache.cache_dir())"
+
+
+# patch pytorch afin de pouvoir utilisé le mega cache correctement
+python3 -c 'from pathlib import Path; t=Path("/usr/local/lib/python3.12/dist-packages/torch/_inductor/runtime/triton_heuristics.py"); c=Path("/usr/local/lib/python3.12/dist-packages/torch/_inductor/runtime/coordinate_descent_tuner.py"); s=t.read_text(); s=s.replace("if len(cached_configs) == 1 and len(configs) > 1:","if len(cached_configs) == 1:"); s=s.replace("            self.compile_results = [compile_result]\n            return","            compile_result.config.found_by_coordesc = best_config.found_by_coordesc\n            self.compile_results = [compile_result]\n            return",1); s=s.replace("        self.autotune_cache_info = autotune_cache_info\n        if len(cached_configs) == 1:","        self.autotune_cache_info = autotune_cache_info\n        print(f\"[RECHECK] name={self.fn.__name__} configs={len(configs)} cached={len(cached_configs)}\", flush=True)\n        if len(cached_configs) == 1:",1); t.write_text(s); s=c.read_text(); old="    def call_func(self, func, config):\n        found = self.lookup_in_cache(config)\n        if found is not None:\n            log.debug(\"  CACHED\")\n            return found\n        timing = func(config)\n        self.cache_benchmark_result(config, timing)\n        return timing"; new="    def call_func(self, func, config):\n        found = self.lookup_in_cache(config)\n        print(f\"[AUTO-TRACE-CALLFUNC] LOOKUP name={self.name}\", flush=True)\n        if found is not None:\n            print(f\"[AUTO-TRACE-CALLFUNC] CACHED name={self.name} timing={found:.6f}\", flush=True)\n            log.debug(\"  CACHED\")\n            return found\n        print(f\"[AUTO-TRACE-CALLFUNC] BENCHMARK name={self.name}\", flush=True)\n        timing = func(config)\n        print(f\"[AUTO-TRACE-CALLFUNC] RESULT name={self.name} timing={timing:.6f}\", flush=True)\n        self.cache_benchmark_result(config, timing)\n        return timing"; s=s.replace(old,new,1); c.write_text(s); print("PATCHES DONE")'
+
+## verification des patch créer si dessus
+grep -n "if len(cached_configs) == 1:" /usr/local/lib/python3.12/dist-packages/torch/_inductor/runtime/triton_heuristics.py
+grep -n "found_by_coordesc = best_config.found_by_coordesc" /usr/local/lib/python3.12/dist-packages/torch/_inductor/runtime/triton_heuristics.py
+
+
+python3 fill_pytorch_compile2.py 2>&1 | tee /app/create_cache.log
+
+
+  GÉNÉRATION 1
+                 nouveau process
+                       │
+              init_model(compile=True)
+                       │
+             generate_long(compile=False)
+                       │
+                       ▼
+             CACHE INDUCTOR créé
+                       │
+                       │
+                       ▼
+                 GÉNÉRATION 2
+                 nouveau process
+                       │
+              init_model(compile=True)
+                       │
+             generate_long(compile=True)
+                       │
+             ┌─────────┴─────────┐
+             ▼                   ▼
+     utilise cache          crée MegaCache
+       Inductor             megacache.pt
+             │                   │
+             └─────────┬─────────┘
+                       ▼
+                 GÉNÉRATION 3
+                 nouveau process
+                       │
+              init_model(compile=True)
+                       │
+             generate_long(compile=False)
+                       │
+                       ▼
+             CACHE INDUCTOR
+                    +
+               MEGACACHE
+                    │
+                    ▼
+                 MESURE
