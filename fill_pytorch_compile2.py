@@ -18,6 +18,11 @@ create_mega_cache = False
 use_torch_inductor_cache = True
 
 
+import logging
+
+logging.getLogger("torch._functorch._aot_autograd.autograd_cache").setLevel(logging.INFO)
+
+
 # ============================================================
 # CONFIG
 # ============================================================
