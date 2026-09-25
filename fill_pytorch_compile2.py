@@ -271,6 +271,7 @@ def generate_voice(text: str, output_path: Path):
     generated_codes_cpu = generated_codes.cpu()
 
     torch.cuda.synchronize()
+    print("[AOT COUNTERS]", dict(torch._dynamo.utils.counters["aot_autograd"]), flush=True)
 
     t_generation = time.perf_counter() - t_total
 
