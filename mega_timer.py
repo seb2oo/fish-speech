@@ -12,7 +12,7 @@ from collections import defaultdict
 # CONFIG
 # ============================================================
 
-TARGET = "/app/fill_pytorch_compile2.py"
+TARGET = "/app/fish-speech/fill_pytorch_compile2.py"
 
 # We only care about functions taking meaningful time.
 MIN_TOTAL = 0.100       # 100 ms cumulative
