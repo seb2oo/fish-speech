@@ -243,16 +243,31 @@ def decode_n_tokens(
         # new start
         if i == 0:
             torch.cuda.synchronize()
+
             t_compile = time.perf_counter()
+
+            gpu_start = torch.cuda.Event(enable_timing=True)
+            gpu_end = torch.cuda.Event(enable_timing=True)
+
+            gpu_start.record()
 
         with sdpa_kernel(SDPBackend.MATH):
             next_token = decode_one_token(**decode_kwargs).clone()
 
         if i == 0:
+            gpu_end.record()
+
+            # Attend la fin réelle du travail GPU
             torch.cuda.synchronize()
+
+            cpu_time = time.perf_counter() - t_compile
+            gpu_time = gpu_start.elapsed_time(gpu_end) / 1000.0
+
             logger.info(
-                f"[PROFILE] first compiled decode_one_token: "
-                f"{time.perf_counter() - t_compile:.3f}s"
+                f"[PROFILE] first compiled decode_one_token CPU: {cpu_time:.3f}s"
+            )
+            logger.info(
+                f"[PROFILE] first compiled decode_one_token GPU: {gpu_time:.3f}s"
             )
         # new end
 
