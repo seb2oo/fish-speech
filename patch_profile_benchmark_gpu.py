@@ -53,57 +53,80 @@ def main():
             "[ERROR] InductorBenchmarker.benchmark_gpu() not found"
         )
 
-    # We insert timing immediately after the function definition.
-    # This measures the complete body by using a try/finally wrapper.
+    # Find the exact decorator insertion point.
+    # We put a small wrapper immediately before benchmark_gpu.
+    insert_line = target_function.lineno - 1
+
+    wrapper = """    def _profile_benchmark_gpu(self, *args, **kwargs):
+        import time as _profile_bench_time
+
+        _profile_bench_t0 = _profile_bench_time.perf_counter()
+
+        print(
+            f"[PROFILE-BENCH-GPU] START "
+            f"function={getattr(self, 'name', 'unknown')}",
+            flush=True,
+        )
+
+        try:
+            return self._profile_benchmark_gpu_original(
+                *args,
+                **kwargs,
+            )
+        finally:
+            _profile_bench_dt = (
+                _profile_bench_time.perf_counter()
+                - _profile_bench_t0
+            )
+
+            print(
+                f"[PROFILE-BENCH-GPU] END "
+                f"function={getattr(self, 'name', 'unknown')} "
+                f"elapsed={_profile_bench_dt:.6f}s",
+                flush=True,
+            )
+
+"""
+
+    # Rename the original method.
     lines = text.splitlines(keepends=True)
 
-    def line_indent(line):
-        return line[: len(line) - len(line.lstrip())]
+    original_line = lines[insert_line]
 
-    def_indent = line_indent(lines[target_function.lineno - 1])
-    body_indent = def_indent + "    "
-    wrapper_indent = body_indent + "    "
+    if "def benchmark_gpu(" not in original_line:
+        raise SystemExit(
+            "[ERROR] Unexpected benchmark_gpu definition line:\n"
+            + original_line
+        )
 
-    # Insert after the def line.
-    insert_at = target_function.lineno
+    lines[insert_line] = original_line.replace(
+        "def benchmark_gpu(",
+        "def _profile_benchmark_gpu_original(",
+        1,
+    )
 
-    wrapper = [
-        f"{body_indent}import time as _profile_bench_time\n",
-        f"{body_indent}_profile_bench_t0 = _profile_bench_time.perf_counter()\n",
-        f"{body_indent}print(\n",
-        f'{body_indent}    f"[PROFILE-BENCH-GPU] START "\n',
-        f'{body_indent}    f"function={{getattr(self, "name", "unknown")}}",\n',
-        f"{body_indent}    flush=True,\n",
-        f"{body_indent})\n",
-        f"{body_indent}try:\n",
-    ]
+    # Insert wrapper + alias after the original method.
+    # We need the end of the class, not the end of benchmark_gpu,
+    # because benchmark_gpu may contain nested structures.
+    class_end_line = target_class.end_lineno
 
-    # Indent the entire existing function body by 4 spaces.
-    body_start = target_function.lineno
-    body_end = target_function.end_lineno
+    alias = """    benchmark_gpu = _profile_benchmark_gpu
 
-    for idx in range(body_start, body_end):
-        lines[idx] = "    " + lines[idx]
+"""
 
-    # Add finally after the indented original body.
-    finally_block = [
-        f"{body_indent}finally:\n",
-        f"{wrapper_indent}_profile_bench_dt = _profile_bench_time.perf_counter() - _profile_bench_t0\n",
-        f"{wrapper_indent}print(\n",
-        f'{wrapper_indent}    f"[PROFILE-BENCH-GPU] END "\n',
-        f'{wrapper_indent}    f"function={{getattr(self, "name", "unknown")}} "\n',
-        f'{wrapper_indent}    f"elapsed={{_profile_bench_dt:.6f}}s",\n',
-        f"{wrapper_indent}    flush=True,\n",
-        f"{wrapper_indent})\n",
-    ]
+    lines.insert(
+        class_end_line,
+        alias,
+    )
 
-    lines[insert_at:insert_at] = wrapper
+    # Wrapper must appear before the alias, but after the original method.
+    # Recompute the class end after the inserted alias.
+    wrapper_insert_line = class_end_line
 
-    # target_function.end_lineno refers to the original file, so after
-    # inserting the wrapper we need the new end position.
-    new_end = body_end + len(wrapper)
-
-    lines[new_end:new_end] = finally_block
+    lines.insert(
+        wrapper_insert_line,
+        wrapper,
+    )
 
     new_text = "".join(lines)
 
@@ -119,8 +142,7 @@ def main():
     print("[OK] benchmark_gpu profiling installed")
     print("[OK] Syntax check passed")
     print()
-    print("Every InductorBenchmarker.benchmark_gpu() call will report")
-    print("its complete elapsed time.")
+    print("Every benchmark_gpu() call will report its complete duration.")
 
 
 if __name__ == "__main__":
