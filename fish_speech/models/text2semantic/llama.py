@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+import time
 import torch
 import torch.nn as nn
 from einops import rearrange
@@ -562,13 +563,18 @@ class BaseTransformer(nn.Module):
         logger.info(f"Loading model from {path}, config: {config}")
         # Initialize model without passing tokenizer explicitly to __init__
         # model = model_cls(config)
+        t_model = time.perf_counter()
         model = model_cls(config, init_weights=not load_weights)
+        logger.info(
+            f"[TIMING] model_cls(config): {time.perf_counter() - t_model:.2f}s"
+        )
         # Attach tokenizer to model instance for inference convenience (optional, but good for user scripts)
         model.tokenizer = tokenizer
 
         if load_weights is False:
             logger.info("Randomly initialized model")
         else:
+            logger.info("[TIMING] Model construction completed")
             if "int8" in str(Path(path)):
                 logger.info("Using int8 weight-only quantization!")
                 from tools.llama.quantize import WeightOnlyInt8QuantHandler
@@ -626,9 +632,13 @@ class BaseTransformer(nn.Module):
                         weights.pop(k)
             else:
                 raise FileNotFoundError(f"No model weights found in {path_obj}")
-
+            
+            t_load_state = time.perf_counter()
             err = model.load_state_dict(weights, strict=False, assign=True)
             logger.info(f"Model weights loaded - Status: {err}")
+            logger.info(
+                f"[TIMING] load_state_dict: {time.perf_counter() - t_load_state:.2f}s"
+            )
 
         if lora_config is not None:
             setup_lora(model, lora_config)
