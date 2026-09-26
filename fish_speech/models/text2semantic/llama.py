@@ -259,15 +259,36 @@ class BaseTransformer(nn.Module):
         super().__init__()
         self.config = config
 
-        # Slow transformer
-        self.embeddings = nn.Embedding(
-            config.vocab_size,
-            config.dim,
-        )
-        self.codebook_embeddings = nn.Embedding(
-            config.codebook_size * config.num_codebooks,
-            config.dim,
-        )
+        # # Slow transformer
+        # self.embeddings = nn.Embedding(
+        #     config.vocab_size,
+        #     config.dim,
+        # )
+        # self.codebook_embeddings = nn.Embedding(
+        #     config.codebook_size * config.num_codebooks,
+        #     config.dim,
+        # )
+        if _SKIP_LINEAR_INIT:
+            with torch.device("meta"):
+                self.embeddings = nn.Embedding(
+                    config.vocab_size,
+                    config.dim,
+                )
+                self.codebook_embeddings = nn.Embedding(
+                    config.codebook_size * config.num_codebooks,
+                    config.dim,
+                )
+        else:
+            self.embeddings = nn.Embedding(
+                config.vocab_size,
+                config.dim,
+            )
+            self.codebook_embeddings = nn.Embedding(
+                config.codebook_size * config.num_codebooks,
+                config.dim,
+            )
+
+
         logger.info("[TIMING] embeddings completed")
         # self.layers = nn.ModuleList(
         #     TransformerBlock(config, use_sdpa=True) for _ in range(config.n_layer)
