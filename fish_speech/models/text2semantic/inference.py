@@ -414,30 +414,105 @@ def init_model(checkpoint_path, device, precision, compile=False):
     return model.eval(), decode_one_token
 
 
+# @torch.inference_mode()
+# def load_codec_model(codec_checkpoint_path, device, precision=torch.bfloat16):
+#     """Load the DAC codec model for audio encoding/decoding."""
+#     from hydra.utils import instantiate
+#     from omegaconf import OmegaConf
+
+#     config_path = Path(__file__).parent.parent.parent / "configs" / "modded_dac_vq.yaml"
+#     cfg = OmegaConf.load(str(config_path))
+#     codec = instantiate(cfg)
+
+#     state_dict = torch.load(codec_checkpoint_path, map_location="cpu")
+#     if "state_dict" in state_dict:
+#         state_dict = state_dict["state_dict"]
+#     if any("generator" in k for k in state_dict):
+#         state_dict = {
+#             k.replace("generator.", ""): v
+#             for k, v in state_dict.items()
+#             if "generator." in k
+#         }
+#     codec.load_state_dict(state_dict, strict=False)
+#     codec.eval()
+#     codec.to(device=device, dtype=precision)
+#     return codec
+
+
 @torch.inference_mode()
 def load_codec_model(codec_checkpoint_path, device, precision=torch.bfloat16):
     """Load the DAC codec model for audio encoding/decoding."""
+    import time
     from hydra.utils import instantiate
     from omegaconf import OmegaConf
 
-    config_path = Path(__file__).parent.parent.parent / "configs" / "modded_dac_vq.yaml"
-    cfg = OmegaConf.load(str(config_path))
-    codec = instantiate(cfg)
+    t_total = time.perf_counter()
 
+    config_path = Path(__file__).parent.parent.parent / "configs" / "modded_dac_vq.yaml"
+
+    t = time.perf_counter()
+    cfg = OmegaConf.load(str(config_path))
+    logger.info(
+        f"[CODEC TIMING] OmegaConf.load: {time.perf_counter() - t:.3f}s"
+    )
+
+    t = time.perf_counter()
+    codec = instantiate(cfg)
+    logger.info(
+        f"[CODEC TIMING] instantiate(cfg): {time.perf_counter() - t:.3f}s"
+    )
+
+    t = time.perf_counter()
     state_dict = torch.load(codec_checkpoint_path, map_location="cpu")
+    logger.info(
+        f"[CODEC TIMING] torch.load(codec.pth): {time.perf_counter() - t:.3f}s"
+    )
+
+    t = time.perf_counter()
     if "state_dict" in state_dict:
         state_dict = state_dict["state_dict"]
+
     if any("generator" in k for k in state_dict):
         state_dict = {
             k.replace("generator.", ""): v
             for k, v in state_dict.items()
             if "generator." in k
         }
-    codec.load_state_dict(state_dict, strict=False)
-    codec.eval()
-    codec.to(device=device, dtype=precision)
-    return codec
 
+    logger.info(
+        f"[CODEC TIMING] state_dict processing: {time.perf_counter() - t:.3f}s"
+    )
+
+    t = time.perf_counter()
+    load_status = codec.load_state_dict(state_dict, strict=False)
+    logger.info(
+        f"[CODEC TIMING] load_state_dict: {time.perf_counter() - t:.3f}s"
+    )
+    logger.info(f"[CODEC TIMING] load status: {load_status}")
+
+    t = time.perf_counter()
+    codec.eval()
+    logger.info(
+        f"[CODEC TIMING] codec.eval(): {time.perf_counter() - t:.3f}s"
+    )
+
+    t = time.perf_counter()
+    codec.to(device=device, dtype=precision)
+
+    # Synchronize so the timing includes the actual GPU transfer.
+    if str(device).startswith("cuda") and torch.cuda.is_available():
+        torch.cuda.synchronize()
+
+    logger.info(
+        f"[CODEC TIMING] codec.to({device}, {precision}): "
+        f"{time.perf_counter() - t:.3f}s"
+    )
+
+    logger.info(
+        f"[CODEC TIMING] TOTAL: {time.perf_counter() - t_total:.3f}s"
+    )
+
+    return codec
 
 @torch.inference_mode()
 def encode_audio(audio_path, codec, device):
