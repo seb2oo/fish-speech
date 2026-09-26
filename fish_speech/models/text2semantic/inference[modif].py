@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal, Optional, Tuple, Union
 
+from torch._dynamo.utils import counters
+
 import click
 import numpy as np
 import torch
@@ -237,8 +239,52 @@ def decode_n_tokens(
         if supports_kv_len:
             decode_kwargs["kv_len"] = kv_start_pos + i + 1
 
+        # with sdpa_kernel(SDPBackend.MATH):
+        #     next_token = decode_one_token(**decode_kwargs).clone()
+
+        # new start
+        if i == 0:
+            torch.cuda.synchronize()
+
+            t_compile = time.perf_counter()
+
+            # Snapshot des compteurs Inductor avant le premier appel
+            counters_before = dict(counters["inductor"])
+
+            gpu_start = torch.cuda.Event(enable_timing=True)
+            gpu_end = torch.cuda.Event(enable_timing=True)
+
+            gpu_start.record()
+
         with sdpa_kernel(SDPBackend.MATH):
             next_token = decode_one_token(**decode_kwargs).clone()
+
+        if i == 0:
+            gpu_end.record()
+
+            torch.cuda.synchronize()
+
+            cpu_time = time.perf_counter() - t_compile
+            gpu_time = gpu_start.elapsed_time(gpu_end) / 1000.0
+
+            logger.info(
+                f"[PROFILE] first compiled decode_one_token CPU: {cpu_time:.3f}s"
+            )
+            logger.info(
+                f"[PROFILE] first compiled decode_one_token GPU: {gpu_time:.3f}s"
+            )
+
+            # Affiche uniquement les compteurs qui ont changé
+            counters_after = dict(counters["inductor"])
+
+            changed = {}
+            for key, value in counters_after.items():
+                before = counters_before.get(key, 0)
+                if value != before:
+                    changed[key] = (before, value)
+
+            logger.info(f"[INDUCTOR COUNTERS] {changed}")
+        # new end
 
         input_pos += 1
         cur_token = next_token.view(1, model.config.num_codebooks + 1, -1)
@@ -298,14 +344,26 @@ def generate(
     ).dtype  # model weight dtype (bfloat16), NOT prompt dtype (int32)
 
     # Critical fix: Only set up cache on first run or when necessary
+    # if not hasattr(model, "_cache_setup_done") or not model._cache_setup_done:
+    #     with torch.device(device):
+    #         model.setup_caches(
+    #             max_batch_size=1,  # Fixed to 1, avoid dynamic changes
+    #             max_seq_len=model.config.max_seq_len,
+    #             dtype=next(model.parameters()).dtype,
+    #         )
+    #     model._cache_setup_done = True
+
+    t_cache = time.perf_counter()
     if not hasattr(model, "_cache_setup_done") or not model._cache_setup_done:
         with torch.device(device):
             model.setup_caches(
-                max_batch_size=1,  # Fixed to 1, avoid dynamic changes
+                max_batch_size=1,
                 max_seq_len=model.config.max_seq_len,
                 dtype=next(model.parameters()).dtype,
             )
         model._cache_setup_done = True
+    torch.cuda.synchronize()
+    logger.info(f"[PROFILE] setup_caches: {time.perf_counter() - t_cache:.3f}s")
 
     codebook_dim = 1 + model.config.num_codebooks
 
@@ -340,6 +398,12 @@ def generate(
 
     prefill_decode = decode_one_token_ar
 
+    torch.cuda.synchronize()
+    t_first = time.perf_counter()
+
+
+    # prefill_decode = decode_one_token
+
     first_token = prefill_decode(
         model,
         prompt.view(1, codebook_dim, -1),
@@ -352,11 +416,15 @@ def generate(
         audio_parts,
         kv_len=T,
     ).clone()
+    torch.cuda.synchronize()
+    logger.info(f"[PROFILE] first_token: {time.perf_counter() - t_first:.3f}s")
     seq[:, T : T + 1] = first_token
 
     # Recreate input_pos
     input_pos = torch.tensor([T], device=device, dtype=torch.int)
 
+    torch.cuda.synchronize()
+    t_decode = time.perf_counter()
     x = decode_n_tokens(
         model,
         first_token.view(1, codebook_dim, -1),
@@ -372,6 +440,8 @@ def generate(
         kv_start_pos=T,
     )
     seq = seq[:, : T + 1 + x.size(1)]
+    torch.cuda.synchronize()
+    logger.info(f"[PROFILE] decode_n_tokens: {time.perf_counter() - t_decode:.3f}s")
     seq[:, T + 1 :] = x
 
     # Clean up temporary variables
@@ -380,29 +450,153 @@ def generate(
     return seq
 
 
+# def init_model(checkpoint_path, device, precision, compile=False):
+#     model = DualARTransformer.from_pretrained(checkpoint_path, load_weights=True)
+
+#     model = model.to(device=device, dtype=precision)
+#     logger.info(f"Restored model from checkpoint")
+
+#     if isinstance(model, DualARTransformer):
+#         decode_one_token = decode_one_token_ar
+#         # prefill_n_tokens = decode_one_token_ar
+#         logger.info("Using DualARTransformer")
+#     else:
+#         raise ValueError("Unsupported model type")
+
+#     # Pre-create fixed parameter tensors to avoid runtime creation
+#     model.fixed_temperature = torch.tensor(0.7, device=device, dtype=torch.float)
+#     model.fixed_top_p = torch.tensor(0.7, device=device, dtype=torch.float)
+#     model.fixed_repetition_penalty = torch.tensor(1.5, device=device, dtype=torch.float)
+
+#     # Mark whether cache has been initialized
+#     model._cache_setup_done = False
+
+#     if compile:
+#         logger.info("Compiling function...")
+#         decode_one_token = torch.compile(
+#             decode_one_token,
+#             backend="inductor" if torch.cuda.is_available() else "aot_eager",
+#             mode="default" if torch.cuda.is_available() else None,
+#             fullgraph=True,
+#             dynamic=True,
+#         )
+
+#     #new start
+#     # if compile:
+#     #     logger.info("Compiling model forward functions separately...")
+
+#     #     compile_backend = "inductor" if torch.cuda.is_available() else "aot_eager"
+#     #     compile_mode = "default" if torch.cuda.is_available() else None
+
+#     #     model.forward_generate = torch.compile(
+#     #         model.forward_generate,
+#     #         backend=compile_backend,
+#     #         mode=compile_mode,
+#     #         fullgraph=True,
+#     #         dynamic=True,
+#     #     )
+
+#     #     # model.forward_generate_fast = torch.compile(
+#     #     #     model.forward_generate_fast,
+#     #     #     backend=compile_backend,
+#     #     #     mode=compile_mode,
+#     #     #     fullgraph=True,
+#     #     #     dynamic=True,
+#     #     # )
+
+#     #     decode_one_token = decode_one_token_ar
+#     #new end
+
+#     #new start
+#     # if compile:
+#     #     logger.info("Compiling function...")
+#     #     decode_one_token = torch.compile(
+#     #         decode_one_token,
+#     #         backend="inductor" if torch.cuda.is_available() else "aot_eager",
+#     #         mode="default" if torch.cuda.is_available() else None,
+#     #         fullgraph=False,
+#     #         dynamic=True,
+#     #     )
+#     # new end
+
+#     return model.eval(), decode_one_token
+
 def init_model(checkpoint_path, device, precision, compile=False):
-    model = DualARTransformer.from_pretrained(checkpoint_path, load_weights=True)
 
-    model = model.to(device=device, dtype=precision)
-    logger.info(f"Restored model from checkpoint")
+    t = time.time()
 
-    if isinstance(model, DualARTransformer):
-        decode_one_token = decode_one_token_ar
-        # prefill_n_tokens = decode_one_token_ar
-        logger.info("Using DualARTransformer")
-    else:
-        raise ValueError("Unsupported model type")
+    logger.info("[INIT 1] Starting from_pretrained")
 
-    # Pre-create fixed parameter tensors to avoid runtime creation
-    model.fixed_temperature = torch.tensor(0.7, device=device, dtype=torch.float)
-    model.fixed_top_p = torch.tensor(0.7, device=device, dtype=torch.float)
-    model.fixed_repetition_penalty = torch.tensor(1.5, device=device, dtype=torch.float)
+    model = DualARTransformer.from_pretrained(
+        checkpoint_path,
+        load_weights=True
+    )
 
-    # Mark whether cache has been initialized
+    logger.info(
+        f"[INIT 1] from_pretrained: {time.time() - t:.2f}s"
+    )
+
+
+    t = time.time()
+
+    logger.info("[INIT 2] Moving model to device")
+
+    model = model.to(
+        device=device,
+        dtype=precision
+    )
+
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+
+    logger.info(
+        f"[INIT 2] model.to(): {time.time() - t:.2f}s"
+    )
+
+
+    t = time.time()
+
+    logger.info("[INIT 3] Creating fixed tensors")
+
+    model.fixed_temperature = torch.tensor(
+        0.7,
+        device=device,
+        dtype=torch.float
+    )
+
+    model.fixed_top_p = torch.tensor(
+        0.7,
+        device=device,
+        dtype=torch.float
+    )
+
+    model.fixed_repetition_penalty = torch.tensor(
+        1.5,
+        device=device,
+        dtype=torch.float
+    )
+
+    logger.info(
+        f"[INIT 3] fixed tensors: {time.time() - t:.2f}s"
+    )
+
+
+    t = time.time()
+
+    logger.info("[INIT 4] Setting cache flag")
+
     model._cache_setup_done = False
 
+    logger.info(
+        f"[INIT 4] cache flag: {time.time() - t:.2f}s"
+    )
+
+
+    t = time.time()
+
     if compile:
-        logger.info("Compiling function...")
+        logger.info("[INIT 5] Creating torch.compile wrapper")
+
         decode_one_token = torch.compile(
             decode_one_token,
             backend="inductor" if torch.cuda.is_available() else "aot_eager",
@@ -410,6 +604,10 @@ def init_model(checkpoint_path, device, precision, compile=False):
             fullgraph=True,
             dynamic=True,
         )
+
+    logger.info(
+        f"[INIT 5] torch.compile wrapper: {time.time() - t:.2f}s"
+    )
 
     return model.eval(), decode_one_token
 
@@ -709,11 +907,41 @@ def generate_long(
                 top_k=top_k,
             )
 
+            # if sample_idx == 0 and batch_idx == 0 and compile:
+            #     logger.info(f"Compilation time: {time.perf_counter() - t0:.2f} seconds")
+
+            # if torch.cuda.is_available():
+            #     torch.cuda.synchronize()
+
+            # new start
             if sample_idx == 0 and batch_idx == 0 and compile:
                 logger.info(f"Compilation time: {time.perf_counter() - t0:.2f} seconds")
 
+                # Save PyTorch Mega-Cache after the first compilation
+                try:
+                    artifacts = torch.compiler.save_cache_artifacts()
+
+                    if artifacts is not None:
+                        artifact_bytes, cache_info = artifacts
+
+                        cache_path = "/app/megacache.pt"
+                        with open(cache_path, "wb") as f:
+                            f.write(artifact_bytes)
+
+                        logger.info(
+                            f"[MEGACACHE] Saved {len(artifact_bytes) / 1024 / 1024:.2f} MB "
+                            f"to {cache_path}"
+                        )
+                        logger.info(f"[MEGACACHE] Info: {cache_info}")
+                    else:
+                        logger.warning("[MEGACACHE] No artifacts returned!")
+
+                except Exception:
+                    logger.exception("[MEGACACHE] Failed to save cache artifacts")
+
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
+            #new end
 
             t_batch = time.perf_counter() - t0
             tokens_generated = y.size(1) - prompt_length
@@ -899,6 +1127,9 @@ def main(
     model, decode_one_token = init_model(
         checkpoint_path, device, precision, compile=compile
     )
+    logger.info("[CACHE] Starting setup_caches")
+    t = time.time()
+
     with torch.device(device):
         model.setup_caches(
             max_batch_size=1,
@@ -907,6 +1138,11 @@ def main(
         )
     if torch.cuda.is_available():
         torch.cuda.synchronize()
+
+    
+    logger.info(
+    f"[CACHE] setup_caches: {time.time() - t:.2f}s"
+    )
 
     logger.info(f"Time to load model: {time.time() - t0:.02f} seconds")
 
