@@ -925,8 +925,15 @@ def main(
         ]
         logger.info(f"Encoded {len(prompt_audio)} audio file(s) to VQ codes")
     elif prompt_tokens is not None:
+        # Load existing VQ codes directly
         prompt_tokens_list = [torch.from_numpy(np.load(p)) for p in prompt_tokens]
-    logger.info(f"Time to load codec: {time.time() - t0:.02f} seconds")
+
+        # Also initialize codec for timing/benchmarking.
+        # We do not re-encode the prompt audio.
+        logger.info("Loading codec model for initialization...")
+        codec = load_codec_model(codec_checkpoint, device, precision)
+
+    logger.info(f"Time to load codec: {time.time() - t0:.2f} seconds")
 
     torch.manual_seed(seed)
 
