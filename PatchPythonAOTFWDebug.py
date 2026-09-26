@@ -1,4 +1,4 @@
-```python
+
 from pathlib import Path
 import shutil
 
@@ -67,4 +67,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-```
+
