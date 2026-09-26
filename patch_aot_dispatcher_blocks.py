@@ -17,21 +17,17 @@ if "[AOT-BLOCK-TIMER]" in text:
 BACKUP.write_text(text)
 
 # ------------------------------------------------------------
-# 1. import time
+# 1. Ensure "import time" exists
 # ------------------------------------------------------------
 
-if "import time\n" not in text:
-    needle = "import functools\n"
+if "import time" not in text:
+    lines = text.splitlines(True)
 
-    if needle not in text:
-        print("ERROR: could not find import functools")
-        raise SystemExit(1)
+    insert_at = 0
 
-    text = text.replace(
-        needle,
-        needle + "import time\n",
-        1,
-    )
+    # Insert after the initial module docstring/import area.
+    # Safest simple approach: prepend the import.
+    text = "import time\n" + text
 
 # ------------------------------------------------------------
 # 2. BEFORE metadata collection
