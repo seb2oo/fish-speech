@@ -14,8 +14,6 @@ from torch.nn import functional as F
 from torch.nn.utils.parametrizations import weight_norm
 from torch.nn.utils.parametrize import remove_parametrizations
 
-_SKIP_CODEC_INIT = False
-
 
 @dataclass
 class VQResult:
@@ -115,13 +113,8 @@ class Transformer(nn.Module):
         else:
             self.register_buffer("freqs_cis", None)
 
-        # causal_mask = torch.tril(torch.ones(32768, 32768, dtype=torch.bool))
-        # self.register_buffer("causal_mask", causal_mask, persistent=False)
-        self.register_buffer(
-            "causal_mask",
-            None,
-            persistent=False,
-        )
+        causal_mask = torch.tril(torch.ones(32768, 32768, dtype=torch.bool))
+        self.register_buffer("causal_mask", causal_mask, persistent=False)
 
         self.max_batch_size = -1
         self.max_seq_length = -1
@@ -164,40 +157,13 @@ class Transformer(nn.Module):
         else:
             freqs_cis = None
 
-        # if mask is None:  # in case of non-causal model
-        #     if not self.training and self.use_kv_cache:
-        #         mask = self.causal_mask[None, None, input_pos]
-        #         mask = mask[..., : input_pos.max() + 1]
-        #     else:
-        #         mask = self.causal_mask[None, None, input_pos]
-        #         mask = mask[..., input_pos]
-        if mask is None:
+        if mask is None:  # in case of non-causal model
             if not self.training and self.use_kv_cache:
-                active_kv_len = input_pos.max() + 1
-
-                mask = (
-                    input_pos[:, None]
-                    >= torch.arange(
-                        active_kv_len,
-                        device=input_pos.device,
-                    )[None, :]
-                )
-
-                mask = mask[None, None, :, :]
-
+                mask = self.causal_mask[None, None, input_pos]
+                mask = mask[..., : input_pos.max() + 1]
             else:
-                seq_len = x.shape[1]
-
-                mask = torch.tril(
-                    torch.ones(
-                        seq_len,
-                        seq_len,
-                        dtype=torch.bool,
-                        device=x.device,
-                    )
-                )
-
-                mask = mask[None, None]
+                mask = self.causal_mask[None, None, input_pos]
+                mask = mask[..., input_pos]
 
         for i, layer in enumerate(self.layers):
             x = layer(x, input_pos, freqs_cis, mask)
@@ -236,31 +202,8 @@ class Attention(nn.Module):
 
         total_head_dim = (config.n_head + 2 * config.n_local_heads) * config.head_dim
         # key, query, value projections for all heads, but in a batch
-        # self.wqkv = nn.Linear(config.dim, total_head_dim, bias=False)
-        # self.wo = nn.Linear(config.head_dim * config.n_head, config.dim, bias=False)
-        if _SKIP_CODEC_INIT:
-            with torch.device("meta"):
-                self.wqkv = nn.Linear(
-                    config.dim,
-                    total_head_dim,
-                    bias=False,
-                )
-                self.wo = nn.Linear(
-                    config.head_dim * config.n_head,
-                    config.dim,
-                    bias=False,
-                )
-        else:
-            self.wqkv = nn.Linear(
-                config.dim,
-                total_head_dim,
-                bias=False,
-            )
-            self.wo = nn.Linear(
-                config.head_dim * config.n_head,
-                config.dim,
-                bias=False,
-            )
+        self.wqkv = nn.Linear(config.dim, total_head_dim, bias=False)
+        self.wo = nn.Linear(config.head_dim * config.n_head, config.dim, bias=False)
         self.kv_cache = None
 
         self.n_head = config.n_head
@@ -365,42 +308,9 @@ class Attention(nn.Module):
 class FeedForward(nn.Module):
     def __init__(self, config: ModelArgs) -> None:
         super().__init__()
-        # self.w1 = nn.Linear(config.dim, config.intermediate_size, bias=False)
-        # self.w3 = nn.Linear(config.dim, config.intermediate_size, bias=False)
-        # self.w2 = nn.Linear(config.intermediate_size, config.dim, bias=False)
-        if _SKIP_CODEC_INIT:
-            with torch.device("meta"):
-                self.w1 = nn.Linear(
-                    config.dim,
-                    config.intermediate_size,
-                    bias=False,
-                )
-                self.w3 = nn.Linear(
-                    config.dim,
-                    config.intermediate_size,
-                    bias=False,
-                )
-                self.w2 = nn.Linear(
-                    config.intermediate_size,
-                    config.dim,
-                    bias=False,
-                )
-        else:
-            self.w1 = nn.Linear(
-                config.dim,
-                config.intermediate_size,
-                bias=False,
-            )
-            self.w3 = nn.Linear(
-                config.dim,
-                config.intermediate_size,
-                bias=False,
-            )
-            self.w2 = nn.Linear(
-                config.intermediate_size,
-                config.dim,
-                bias=False,
-            )
+        self.w1 = nn.Linear(config.dim, config.intermediate_size, bias=False)
+        self.w3 = nn.Linear(config.dim, config.intermediate_size, bias=False)
+        self.w2 = nn.Linear(config.intermediate_size, config.dim, bias=False)
         self.dropout = nn.Dropout(config.dropout_rate)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -944,9 +854,7 @@ class DAC(BaseModel, CodecMixin):
                 transformer_general_config=transformer_general_config,
             )
         self.sample_rate = sample_rate
-        # self.apply(init_weights)
-        if not _SKIP_CODEC_INIT:
-            self.apply(init_weights)
+        self.apply(init_weights)
 
         self.delay = self.get_delay()
 

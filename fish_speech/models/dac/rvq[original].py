@@ -9,8 +9,6 @@ from dac.nn.quantize import ResidualVectorQuantize
 from torch.nn.utils.parametrizations import weight_norm
 from torch.nn.utils.parametrize import remove_parametrizations
 
-_SKIP_CODEC_INIT = False
-
 
 def unpad1d(x: torch.Tensor, paddings: tp.Tuple[int, int]):
     """Remove padding from x, handling properly zero padding. Only for 1d!"""
@@ -69,33 +67,14 @@ class CausalConvNet(nn.Module):
         padding=None,
     ):
         super(CausalConvNet, self).__init__()
-        # self.conv = nn.Conv1d(
-        #     in_channels,
-        #     out_channels,
-        #     kernel_size,
-        #     stride=stride,
-        #     dilation=dilation,
-        #     groups=groups,
-        # )
-        if _SKIP_CODEC_INIT:
-            with torch.device("meta"):
-                self.conv = nn.Conv1d(
-                    in_channels,
-                    out_channels,
-                    kernel_size,
-                    stride=stride,
-                    dilation=dilation,
-                    groups=groups,
-                )
-        else:
-            self.conv = nn.Conv1d(
-                in_channels,
-                out_channels,
-                kernel_size,
-                stride=stride,
-                dilation=dilation,
-                groups=groups,
-            )
+        self.conv = nn.Conv1d(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride=stride,
+            dilation=dilation,
+            groups=groups,
+        )
         self.stride = stride
         self.kernel_size = (kernel_size - 1) * dilation + 1
         self.dilation = dilation
@@ -123,26 +102,9 @@ class CausalTransConvNet(nn.Module):
         self, in_channels, out_channels, kernel_size, dilation=1, stride=1, padding=None
     ):
         super(CausalTransConvNet, self).__init__()
-        # self.conv = nn.ConvTranspose1d(
-        #     in_channels, out_channels, kernel_size, stride=stride, dilation=dilation
-        # )
-        if _SKIP_CODEC_INIT:
-            with torch.device("meta"):
-                self.conv = nn.ConvTranspose1d(
-                    in_channels,
-                    out_channels,
-                    kernel_size,
-                    stride=stride,
-                    dilation=dilation,
-                )
-        else:
-            self.conv = nn.ConvTranspose1d(
-                in_channels,
-                out_channels,
-                kernel_size,
-                stride=stride,
-                dilation=dilation,
-            )
+        self.conv = nn.ConvTranspose1d(
+            in_channels, out_channels, kernel_size, stride=stride, dilation=dilation
+        )
         self.stride = stride
         self.kernel_size = kernel_size
 
@@ -197,34 +159,11 @@ class ConvNeXtBlock(nn.Module):
             dilation=dilation,
         )  # depthwise conv
         self.norm = nn.LayerNorm(dim, eps=1e-6)
-        # self.pwconv1 = nn.Linear(
-        #     dim, int(mlp_ratio * dim)
-        # )  # pointwise/1x1 convs, implemented with linear layers
-        # self.act = nn.GELU()
-        # self.pwconv2 = nn.Linear(int(mlp_ratio * dim), dim)
-
-        if _SKIP_CODEC_INIT:
-            with torch.device("meta"):
-                self.pwconv1 = nn.Linear(
-                    dim,
-                    int(mlp_ratio * dim),
-                )
-                self.pwconv2 = nn.Linear(
-                    int(mlp_ratio * dim),
-                    dim,
-                )
-        else:
-            self.pwconv1 = nn.Linear(
-                dim,
-                int(mlp_ratio * dim),
-            )
-            self.pwconv2 = nn.Linear(
-                int(mlp_ratio * dim),
-                dim,
-            )
-
+        self.pwconv1 = nn.Linear(
+            dim, int(mlp_ratio * dim)
+        )  # pointwise/1x1 convs, implemented with linear layers
         self.act = nn.GELU()
-
+        self.pwconv2 = nn.Linear(int(mlp_ratio * dim), dim)
         self.gamma = (
             nn.Parameter(layer_scale_init_value * torch.ones((dim)), requires_grad=True)
             if layer_scale_init_value > 0
@@ -335,9 +274,7 @@ class DownsampleResidualVectorQuantize(nn.Module):
                 for idx, factor in reversed(list(enumerate(downsample_factor)))
             ]
         )
-        # self.apply(self._init_weights)
-        if not _SKIP_CODEC_INIT:
-            self.apply(self._init_weights)
+        self.apply(self._init_weights)
         self.pre_module = (
             pre_module if pre_module is not None else nn.Identity()
         )  # leave for transformer, LSTM or Mamba or something else

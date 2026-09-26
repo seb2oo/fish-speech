@@ -445,6 +445,8 @@ def load_codec_model(codec_checkpoint_path, device, precision=torch.bfloat16):
     import time
     from hydra.utils import instantiate
     from omegaconf import OmegaConf
+    import fish_speech.models.dac.modded_dac as modded_dac
+    import fish_speech.models.dac.rvq as rvq
 
     t_total = time.perf_counter()
 
@@ -456,11 +458,31 @@ def load_codec_model(codec_checkpoint_path, device, precision=torch.bfloat16):
         f"[CODEC TIMING] OmegaConf.load: {time.perf_counter() - t:.3f}s"
     )
 
+    # t = time.perf_counter()
+    # codec = instantiate(cfg)
+    # logger.info(
+    #     f"[CODEC TIMING] instantiate(cfg): {time.perf_counter() - t:.3f}s"
+    # )
     t = time.perf_counter()
-    codec = instantiate(cfg)
+
+    old_skip_modded_dac = modded_dac._SKIP_CODEC_INIT
+    old_skip_rvq = rvq._SKIP_CODEC_INIT
+
+    modded_dac._SKIP_CODEC_INIT = True
+    rvq._SKIP_CODEC_INIT = True
+
+    try:
+        codec = instantiate(cfg)
+    finally:
+        modded_dac._SKIP_CODEC_INIT = old_skip_modded_dac
+        rvq._SKIP_CODEC_INIT = old_skip_rvq
+
     logger.info(
         f"[CODEC TIMING] instantiate(cfg): {time.perf_counter() - t:.3f}s"
     )
+    
+
+
 
     t = time.perf_counter()
     state_dict = torch.load(codec_checkpoint_path, map_location="cpu")
@@ -484,7 +506,12 @@ def load_codec_model(codec_checkpoint_path, device, precision=torch.bfloat16):
     )
 
     t = time.perf_counter()
-    load_status = codec.load_state_dict(state_dict, strict=False)
+    # load_status = codec.load_state_dict(state_dict, strict=False)
+    load_status = codec.load_state_dict(
+    state_dict,
+    strict=False,
+    assign=True,
+    )
     logger.info(
         f"[CODEC TIMING] load_state_dict: {time.perf_counter() - t:.3f}s"
     )
