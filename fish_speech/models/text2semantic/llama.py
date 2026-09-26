@@ -19,6 +19,9 @@ from torch.utils.checkpoint import checkpoint
 from fish_speech.models.text2semantic.lora import LoraConfig, setup_lora
 
 
+_SKIP_LINEAR_INIT = False
+
+
 def find_multiple(n: int, k: int) -> int:
     if n % k == 0:
         return n
@@ -574,7 +577,16 @@ class BaseTransformer(nn.Module):
         # Initialize model without passing tokenizer explicitly to __init__
         # model = model_cls(config)
         t_model = time.perf_counter()
-        model = model_cls(config, init_weights=not load_weights)
+        # model = model_cls(config, init_weights=not load_weights)
+        global _SKIP_LINEAR_INIT
+        old_skip_linear_init = _SKIP_LINEAR_INIT
+        _SKIP_LINEAR_INIT = load_weights
+
+        try:
+            model = model_cls(config, init_weights=not load_weights)
+        finally:
+            _SKIP_LINEAR_INIT = old_skip_linear_init
+
         logger.info(
             f"[TIMING] model_cls(config): {time.perf_counter() - t_model:.2f}s"
         )
@@ -958,12 +970,31 @@ class Attention(nn.Module):
 
         total_head_dim = (config.n_head + 2 * config.n_local_heads) * config.head_dim
         # key, query, value projections for all heads, but in a batch
-        self.wqkv = nn.Linear(
-            config.dim, total_head_dim, bias=config.attention_qkv_bias
-        )
-        self.wo = nn.Linear(
-            config.n_head * config.head_dim, config.dim, bias=config.attention_o_bias
-        )
+        # self.wqkv = nn.Linear(
+        #     config.dim, total_head_dim, bias=config.attention_qkv_bias
+        # )
+        # self.wo = nn.Linear(
+        #     config.n_head * config.head_dim, config.dim, bias=config.attention_o_bias
+        # )
+        if _SKIP_LINEAR_INIT:
+            with torch.device("meta"):
+                self.wqkv = nn.Linear(
+                    config.dim, total_head_dim, bias=config.attention_qkv_bias
+                )
+                self.wo = nn.Linear(
+                    config.n_head * config.head_dim,
+                    config.dim,
+                    bias=config.attention_o_bias,
+                )
+        else:
+            self.wqkv = nn.Linear(
+                config.dim, total_head_dim, bias=config.attention_qkv_bias
+            )
+            self.wo = nn.Linear(
+                config.n_head * config.head_dim,
+                config.dim,
+                bias=config.attention_o_bias,
+            )
         self.kv_cache = None
 
         if config.attention_qk_norm:
@@ -1092,9 +1123,18 @@ class Attention(nn.Module):
 class FeedForward(nn.Module):
     def __init__(self, config: BaseModelArgs) -> None:
         super().__init__()
-        self.w1 = nn.Linear(config.dim, config.intermediate_size, bias=False)
-        self.w3 = nn.Linear(config.dim, config.intermediate_size, bias=False)
-        self.w2 = nn.Linear(config.intermediate_size, config.dim, bias=False)
+        # self.w1 = nn.Linear(config.dim, config.intermediate_size, bias=False)
+        # self.w3 = nn.Linear(config.dim, config.intermediate_size, bias=False)
+        # self.w2 = nn.Linear(config.intermediate_size, config.dim, bias=False)
+        if _SKIP_LINEAR_INIT:
+            with torch.device("meta"):
+                self.w1 = nn.Linear(config.dim, config.intermediate_size, bias=False)
+                self.w3 = nn.Linear(config.dim, config.intermediate_size, bias=False)
+                self.w2 = nn.Linear(config.intermediate_size, config.dim, bias=False)
+        else:
+            self.w1 = nn.Linear(config.dim, config.intermediate_size, bias=False)
+            self.w3 = nn.Linear(config.dim, config.intermediate_size, bias=False)
+            self.w2 = nn.Linear(config.intermediate_size, config.dim, bias=False)
 
     def forward(self, x: Tensor) -> Tensor:
         return self.w2(F.silu(self.w1(x)) * self.w3(x))
