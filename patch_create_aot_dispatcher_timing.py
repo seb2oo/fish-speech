@@ -8,6 +8,8 @@ text = path.read_text()
 
 old = """    with dynamo_timed("create_aot_dispatcher_function", log_pt2_compile_event=True):
         return _create_aot_dispatcher_function(
+            flat_fn, fake_flat_args, aot_config, fake_mode, shape_env
+        )
 """
 
 new = """    _aot_dispatch_debug_t0 = time.perf_counter()
@@ -19,21 +21,8 @@ new = """    _aot_dispatch_debug_t0 = time.perf_counter()
 
     with dynamo_timed("create_aot_dispatcher_function", log_pt2_compile_event=True):
         result = _create_aot_dispatcher_function(
-"""
-
-if "[AOT-DISPATCHER-TIMER] START" not in text:
-    if old not in text:
-        raise RuntimeError(
-            "Target create_aot_dispatcher_function call not found"
+            flat_fn, fake_flat_args, aot_config, fake_mode, shape_env
         )
-
-    text = text.replace(old, new, 1)
-
-    old_return = """        )
-    return result
-"""
-
-    new_return = """        )
 
     print(
         "[AOT-DISPATCHER-TIMER] END",
@@ -45,40 +34,23 @@ if "[AOT-DISPATCHER-TIMER] START" not in text:
     return result
 """
 
-    # Attention : le premier ")\n    return result" après notre modification
-    # doit être celui de create_aot_dispatcher_function.
-    marker_pos = text.find(
-        '    _aot_dispatch_debug_t0 = time.perf_counter()'
-    )
-
-    if marker_pos == -1:
-        raise RuntimeError("Inserted timer marker not found")
-
-    return_pos = text.find(
-        "    return result",
-        marker_pos,
-    )
-
-    if return_pos == -1:
-        raise RuntimeError("return result not found")
-
-    text = (
-        text[:return_pos]
-        + """    print(
-        "[AOT-DISPATCHER-TIMER] END",
-        "total=",
-        round(time.perf_counter() - _aot_dispatch_debug_t0, 3),
-        flush=True,
-    )
-
-"""
-        + text[return_pos:]
-    )
-
-    path.write_text(text)
-    print("Patch applied successfully.")
-
-else:
+if "[AOT-DISPATCHER-TIMER] START" in text:
     print("Patch already present.")
+else:
+    if old not in text:
+        raise RuntimeError(
+            "Exact create_aot_dispatcher_function block not found"
+        )
+
+    backup = path.with_suffix(".py.backup_create_aot_dispatcher_timing_v2")
+
+    if not backup.exists():
+        backup.write_text(text)
+        print(f"Backup created: {backup}")
+
+    text = text.replace(old, new, 1)
+    path.write_text(text)
+
+    print("Patch applied successfully.")
 
 print(f"File: {path}")
