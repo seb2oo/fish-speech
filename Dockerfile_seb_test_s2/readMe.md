@@ -435,7 +435,8 @@ python3 -m fish_speech.models.text2semantic.inference \
     --prompt-tokens "/app/fish-speech/output/reconstructed.npy" \
     --checkpoint-path "/app/checkpoints/s2-pro" \
     --device cuda \
-    --output "/app/fish-speech/output/test_clone.wav"
+    --output "/app/fish-speech/output/test_clone.wav"\
+    --compile
 
                     ┌──────────────────┐
                     │   fr.wav         │
@@ -534,15 +535,18 @@ python3 -m http.server 8000 --bind 0.0.0.0
 cd /app/fish-speech
 git pull origin docker
 
+
 cd D:\Dev\06_FishSpeech\fish-speech
 
 ************
 ************
 
 PS : avec conteneur actuel : , il faut reinstaller ceci car je n'ai pas utiliser un aute conteneur, ca prend trop de temps ... :
+
 python3 -m pip install --no-cache-dir --break-system-packages click
 apt-get update
 apt-get install -y libc6-dev
+
 apt-get update
 apt-get install -y python3.12-dev
 
@@ -555,20 +559,24 @@ mkdir -p checkpoints/s2-pro
 hf download fishaudio/s2-pro --local-dir /app/checkpoints/s2-pro
 mkdir -p /app/fish-speech/output
 apt-get update && apt-get install -y tree
+
 tree -L 3
 
 # creation du cache "standard"
 mkdir -p /app/torchinductor-cache && export TORCHINDUCTOR_CACHE_DIR=/app/torchinductor-cache
 python3 -c "import os; from torch._inductor import codecache; print('ENV:',os.environ.get('TORCHINDUCTOR_CACHE_DIR')); print('PyTorch cache:',codecache.cache_dir())"
 
+# un des patch principale qui nous a permit d'isoler le soucis (a ne pas re-excuster)
+python3 patch_pytorch_megacache.py
 
-# patch pytorch afin de pouvoir utilisé le mega cache correctement
-python3 -c 'from pathlib import Path; t=Path("/usr/local/lib/python3.12/dist-packages/torch/_inductor/runtime/triton_heuristics.py"); c=Path("/usr/local/lib/python3.12/dist-packages/torch/_inductor/runtime/coordinate_descent_tuner.py"); s=t.read_text(); s=s.replace("if len(cached_configs) == 1 and len(configs) > 1:","if len(cached_configs) == 1:"); s=s.replace("            self.compile_results = [compile_result]\n            return","            compile_result.config.found_by_coordesc = best_config.found_by_coordesc\n            self.compile_results = [compile_result]\n            return",1); s=s.replace("        self.autotune_cache_info = autotune_cache_info\n        if len(cached_configs) == 1:","        self.autotune_cache_info = autotune_cache_info\n        print(f\"[RECHECK] name={self.fn.__name__} configs={len(configs)} cached={len(cached_configs)}\", flush=True)\n        if len(cached_configs) == 1:",1); t.write_text(s); s=c.read_text(); old="    def call_func(self, func, config):\n        found = self.lookup_in_cache(config)\n        if found is not None:\n            log.debug(\"  CACHED\")\n            return found\n        timing = func(config)\n        self.cache_benchmark_result(config, timing)\n        return timing"; new="    def call_func(self, func, config):\n        found = self.lookup_in_cache(config)\n        print(f\"[AUTO-TRACE-CALLFUNC] LOOKUP name={self.name}\", flush=True)\n        if found is not None:\n            print(f\"[AUTO-TRACE-CALLFUNC] CACHED name={self.name} timing={found:.6f}\", flush=True)\n            log.debug(\"  CACHED\")\n            return found\n        print(f\"[AUTO-TRACE-CALLFUNC] BENCHMARK name={self.name}\", flush=True)\n        timing = func(config)\n        print(f\"[AUTO-TRACE-CALLFUNC] RESULT name={self.name} timing={timing:.6f}\", flush=True)\n        self.cache_benchmark_result(config, timing)\n        return timing"; s=s.replace(old,new,1); c.write_text(s); print("PATCHES DONE")'
+# le code qui normalment nous permt de descendre le temps de chargment encore plus 
+python3 patch_remove_tensor_aot_bypass.py
 
-## verification des patch créer si dessus
-grep -n "if len(cached_configs) == 1:" /usr/local/lib/python3.12/dist-packages/torch/_inductor/runtime/triton_heuristics.py
-grep -n "found_by_coordesc = best_config.found_by_coordesc" /usr/local/lib/python3.12/dist-packages/torch/_inductor/runtime/triton_heuristics.py
+# nous permet d'enlever le patch ci dessus
+cp fish_speech/models/text2semantic/inference.py.backup_remove_tensor_aot_bypass fish_speech/models/text2semantic/inference.py
 
+# vérifier que le patch est bien enlevé
+grep -nE 'torch\.(tensor|full_like|zeros|full)\(' fish_speech/models/text2semantic/inference.py
 
 python3 fill_pytorch_compile2.py 2>&1 | tee /app/create_cache.log
 
@@ -613,3 +621,9 @@ python3 fill_pytorch_compile2.py 2>&1 | tee /app/create_cache.log
                     │
                     ▼
                  MESURE
+
+grep -E 'Total generation|Compilation time|\[PROFILE\]|\[RECHECK\]' /app/create_cache.log
+
+echo "BENCHMARKS: $(grep -c '\[AUTO-TRACE-CALLFUNC\] BENCHMARK' /app/create_cache.log) | CACHED: $(grep -c '\[AUTO-TRACE-CALLFUNC\] CACHED' /app/create_cache.log) | LOOKUPS: $(grep -c '\[AUTO-TRACE-CALLFUNC\] LOOKUP' /app/create_cache.log)"
+
+echo "===== LOG ====="; grep -E 'Total generation|Compilation time|\[PROFILE\]|\[RECHECK\]' /app/create_cache.log; echo "BENCHMARKS: $(grep -c '\[AUTO-TRACE-CALLFUNC\] BENCHMARK' /app/create_cache.log) | CACHED: $(grep -c '\[AUTO-TRACE-CALLFUNC\] CACHED' /app/create_cache.log) | LOOKUPS: $(grep -c '\[AUTO-TRACE-CALLFUNC\] LOOKUP' /app/create_cache.log)"; echo; echo "===== INDUCTOR CACHE ====="; du -sh /app/torchinductor-cache 2>/dev/null; du -sh /app/torchinductor-cache/* 2>/dev/null | sort -h; echo "FXGRAPH FILES: $(find /app/torchinductor-cache/fxgraph -type f 2>/dev/null | wc -l)"; echo "TRITON FILES: $(find /app/torchinductor-cache/triton -type f 2>/dev/null | wc -l)"; echo; echo "===== MEGACACHE ====="; stat -c 'File: %n | Size: %s bytes | Modified: %y' /app/megacache.pt 2>/dev/null || echo "megacache.pt ABSENT"

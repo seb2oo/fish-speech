@@ -539,8 +539,7 @@ class BaseTransformer(nn.Module):
 
         logger.info(f"Loading model from {path}, config: {config}")
         # Initialize model without passing tokenizer explicitly to __init__
-        # model = model_cls(config)
-        model = model_cls(config, init_weights=not load_weights)
+        model = model_cls(config)
         # Attach tokenizer to model instance for inference convenience (optional, but good for user scripts)
         model.tokenizer = tokenizer
 
@@ -682,12 +681,7 @@ class NaiveTransformer(BaseTransformer):
 
 
 class DualARTransformer(BaseTransformer):
-    # def __init__(self, config: NaiveModelArgs) -> None:
-    def __init__(
-        self,
-        config: NaiveModelArgs,
-        init_weights: bool = True,
-        ) -> None:
+    def __init__(self, config: NaiveModelArgs) -> None:
         super().__init__(config, init_weights=False)
 
         # Project to fast dim if needed
@@ -732,9 +726,8 @@ class DualARTransformer(BaseTransformer):
             ),
             persistent=False,
         )
-        # self.apply(self._init_weights)
-        if init_weights:
-            self.apply(self._init_weights)
+        self.apply(self._init_weights)
+        
 
     def setup_caches(
         self, max_batch_size: int, max_seq_len: int, dtype: torch.dtype = torch.bfloat16
