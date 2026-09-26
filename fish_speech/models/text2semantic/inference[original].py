@@ -913,8 +913,6 @@ def main(
     codec = None
     codec_checkpoint = checkpoint_path / "codec.pth"
 
-    logger.info("Loading codec ...")
-    t0 = time.time()
     # Handle prompt: --prompt-audio takes priority over --prompt-tokens
     prompt_tokens_list = None
     if prompt_audio:
@@ -926,7 +924,6 @@ def main(
         logger.info(f"Encoded {len(prompt_audio)} audio file(s) to VQ codes")
     elif prompt_tokens is not None:
         prompt_tokens_list = [torch.from_numpy(np.load(p)) for p in prompt_tokens]
-    logger.info(f"Time to load codec: {time.time() - t0:.02f} seconds")
 
     torch.manual_seed(seed)
 
