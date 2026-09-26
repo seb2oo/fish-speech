@@ -265,9 +265,19 @@ class BaseTransformer(nn.Module):
             config.codebook_size * config.num_codebooks,
             config.dim,
         )
+        # self.layers = nn.ModuleList(
+        #     TransformerBlock(config, use_sdpa=True) for _ in range(config.n_layer)
+        # )
+        t_layers = time.perf_counter()
         self.layers = nn.ModuleList(
             TransformerBlock(config, use_sdpa=True) for _ in range(config.n_layer)
         )
+        logger.info(
+            f"[TIMING] slow TransformerBlock x{config.n_layer}: "
+            f"{time.perf_counter() - t_layers:.2f}s"
+        )
+
+
         self.norm = RMSNorm(config.dim, eps=config.norm_eps)
 
         if self.config.tie_word_embeddings is False:
@@ -744,9 +754,19 @@ class DualARTransformer(BaseTransformer):
             attention_o_bias=config.fast_attention_o_bias,
         )
 
+        # self.fast_layers = nn.ModuleList(
+        #     TransformerBlock(override_config, use_sdpa=False)
+        #     for _ in range(config.n_fast_layer)
+        # )
+
+        t_fast_layers = time.perf_counter()
         self.fast_layers = nn.ModuleList(
             TransformerBlock(override_config, use_sdpa=False)
             for _ in range(config.n_fast_layer)
+        )
+        logger.info(
+            f"[TIMING] fast TransformerBlock x{config.n_fast_layer}: "
+            f"{time.perf_counter() - t_fast_layers:.2f}s"
         )
         self.fast_norm = RMSNorm(config.fast_dim, eps=config.norm_eps)
         self.fast_output = nn.Linear(
@@ -765,6 +785,7 @@ class DualARTransformer(BaseTransformer):
             persistent=False,
         )
         # self.apply(self._init_weights)
+        logger.info("[TIMING] DualARTransformer construction blocks completed")
         if init_weights:
             self.apply(self._init_weights)
 
