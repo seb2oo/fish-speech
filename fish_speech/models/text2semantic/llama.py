@@ -285,15 +285,20 @@ class BaseTransformer(nn.Module):
             ),
             persistent=False,
         )
+        # self.register_buffer(
+        #     "causal_mask",
+        #     torch.tril(
+        #         torch.ones(
+        #             config.max_seq_len,
+        #             config.max_seq_len,
+        #             dtype=torch.bool,
+        #         )
+        #     ),
+        #     persistent=False,
+        # )
         self.register_buffer(
             "causal_mask",
-            torch.tril(
-                torch.ones(
-                    config.max_seq_len,
-                    config.max_seq_len,
-                    dtype=torch.bool,
-                )
-            ),
+            None,
             persistent=False,
         )
 
@@ -358,7 +363,16 @@ class BaseTransformer(nn.Module):
 
         mask = None
         if key_padding_mask is not None:
-            causal = self.causal_mask[:seq_len, :seq_len]
+            # causal = self.causal_mask[:seq_len, :seq_len]
+            # causal = rearrange(causal, "q k -> 1 1 q k")
+            causal = torch.tril(
+                torch.ones(
+                    seq_len,
+                    seq_len,
+                    dtype=torch.bool,
+                    device=x.device,
+                )
+            )
             causal = rearrange(causal, "q k -> 1 1 q k")
 
             atten_mask = rearrange(key_padding_mask, "b s -> b 1 1 s")
@@ -456,10 +470,18 @@ class BaseTransformer(nn.Module):
         elif not torch.compiler.is_compiling() and not bool(input_pos_is_valid):
             raise ValueError("input_pos must be within the active KV prefix")
 
-        mask = self.causal_mask[
-            None, None, input_pos, :active_kv_len
-        ]  # (B, N, Q, active K)
+        # mask = self.causal_mask[
+        #     None, None, input_pos, :active_kv_len
+        # ]  # (B, N, Q, active K)
+
+        mask = (
+                    input_pos[:, None]
+                    >= torch.arange(active_kv_len, device=input_pos.device)[None, :]
+        )
+        mask = mask[None, None, :, :]  # (B, N, Q, active K)
+
         freqs_cis = self.freqs_cis[input_pos]
+        
 
         for layer in self.layers:
             x = layer(x, freqs_cis, mask, input_pos=input_pos)
@@ -772,9 +794,17 @@ class DualARTransformer(BaseTransformer):
 
         # Fast transformer
         fast_seq_len = self.config.num_codebooks
-        fast_mask = self.causal_mask[
-            None, None, :fast_seq_len, :fast_seq_len
-        ]  # (B, N, Q, K)
+        # fast_mask = self.causal_mask[
+        #     None, None, :fast_seq_len, :fast_seq_len
+        # ]  # (B, N, Q, K)
+        fast_mask = torch.tril(
+            torch.ones(
+                fast_seq_len,
+                fast_seq_len,
+                dtype=torch.bool,
+                device=x.device,
+            )
+        )[None, None, :, :]  # (B, N, Q, K)
         fast_freqs_cis = self.fast_freqs_cis[:fast_seq_len]
 
         # Extract corresponding parts with labels
@@ -833,9 +863,17 @@ class DualARTransformer(BaseTransformer):
         # Fast transformer
         x = x.view(x.shape[0], 1, -1)
 
-        fast_mask = self.causal_mask[
-            None, None, input_pos, : self.config.num_codebooks
-        ]  # (B, N, Q, K)
+        # fast_mask = self.causal_mask[
+        #     None, None, input_pos, : self.config.num_codebooks
+        # ]  # (B, N, Q, K)
+        fast_mask = (
+            input_pos[:, None]
+            >= torch.arange(
+                self.config.num_codebooks,
+                device=input_pos.device,
+            )[None, :]
+        )
+        fast_mask = fast_mask[None, None, :, :]  # (B, N, Q, K)
         fast_freqs_cis = self.fast_freqs_cis[input_pos]
 
         for layer in self.fast_layers:
