@@ -268,6 +268,7 @@ class BaseTransformer(nn.Module):
             config.codebook_size * config.num_codebooks,
             config.dim,
         )
+        logger.info("[TIMING] embeddings completed")
         # self.layers = nn.ModuleList(
         #     TransformerBlock(config, use_sdpa=True) for _ in range(config.n_layer)
         # )
@@ -282,6 +283,7 @@ class BaseTransformer(nn.Module):
 
 
         self.norm = RMSNorm(config.dim, eps=config.norm_eps)
+        logger.info("[TIMING] norm completed")
 
         if self.config.tie_word_embeddings is False:
             self.output = nn.Linear(
@@ -299,6 +301,7 @@ class BaseTransformer(nn.Module):
             ),
             persistent=False,
         )
+        logger.info("[TIMING] freqs_cis completed")
         # self.register_buffer(
         #     "causal_mask",
         #     torch.tril(
