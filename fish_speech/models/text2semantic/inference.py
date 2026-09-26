@@ -450,29 +450,153 @@ def generate(
     return seq
 
 
+# def init_model(checkpoint_path, device, precision, compile=False):
+#     model = DualARTransformer.from_pretrained(checkpoint_path, load_weights=True)
+
+#     model = model.to(device=device, dtype=precision)
+#     logger.info(f"Restored model from checkpoint")
+
+#     if isinstance(model, DualARTransformer):
+#         decode_one_token = decode_one_token_ar
+#         # prefill_n_tokens = decode_one_token_ar
+#         logger.info("Using DualARTransformer")
+#     else:
+#         raise ValueError("Unsupported model type")
+
+#     # Pre-create fixed parameter tensors to avoid runtime creation
+#     model.fixed_temperature = torch.tensor(0.7, device=device, dtype=torch.float)
+#     model.fixed_top_p = torch.tensor(0.7, device=device, dtype=torch.float)
+#     model.fixed_repetition_penalty = torch.tensor(1.5, device=device, dtype=torch.float)
+
+#     # Mark whether cache has been initialized
+#     model._cache_setup_done = False
+
+#     if compile:
+#         logger.info("Compiling function...")
+#         decode_one_token = torch.compile(
+#             decode_one_token,
+#             backend="inductor" if torch.cuda.is_available() else "aot_eager",
+#             mode="default" if torch.cuda.is_available() else None,
+#             fullgraph=True,
+#             dynamic=True,
+#         )
+
+#     #new start
+#     # if compile:
+#     #     logger.info("Compiling model forward functions separately...")
+
+#     #     compile_backend = "inductor" if torch.cuda.is_available() else "aot_eager"
+#     #     compile_mode = "default" if torch.cuda.is_available() else None
+
+#     #     model.forward_generate = torch.compile(
+#     #         model.forward_generate,
+#     #         backend=compile_backend,
+#     #         mode=compile_mode,
+#     #         fullgraph=True,
+#     #         dynamic=True,
+#     #     )
+
+#     #     # model.forward_generate_fast = torch.compile(
+#     #     #     model.forward_generate_fast,
+#     #     #     backend=compile_backend,
+#     #     #     mode=compile_mode,
+#     #     #     fullgraph=True,
+#     #     #     dynamic=True,
+#     #     # )
+
+#     #     decode_one_token = decode_one_token_ar
+#     #new end
+
+#     #new start
+#     # if compile:
+#     #     logger.info("Compiling function...")
+#     #     decode_one_token = torch.compile(
+#     #         decode_one_token,
+#     #         backend="inductor" if torch.cuda.is_available() else "aot_eager",
+#     #         mode="default" if torch.cuda.is_available() else None,
+#     #         fullgraph=False,
+#     #         dynamic=True,
+#     #     )
+#     # new end
+
+#     return model.eval(), decode_one_token
+
 def init_model(checkpoint_path, device, precision, compile=False):
-    model = DualARTransformer.from_pretrained(checkpoint_path, load_weights=True)
 
-    model = model.to(device=device, dtype=precision)
-    logger.info(f"Restored model from checkpoint")
+    t = time.time()
 
-    if isinstance(model, DualARTransformer):
-        decode_one_token = decode_one_token_ar
-        # prefill_n_tokens = decode_one_token_ar
-        logger.info("Using DualARTransformer")
-    else:
-        raise ValueError("Unsupported model type")
+    logger.info("[INIT 1] Starting from_pretrained")
 
-    # Pre-create fixed parameter tensors to avoid runtime creation
-    model.fixed_temperature = torch.tensor(0.7, device=device, dtype=torch.float)
-    model.fixed_top_p = torch.tensor(0.7, device=device, dtype=torch.float)
-    model.fixed_repetition_penalty = torch.tensor(1.5, device=device, dtype=torch.float)
+    model = DualARTransformer.from_pretrained(
+        checkpoint_path,
+        load_weights=True
+    )
 
-    # Mark whether cache has been initialized
+    logger.info(
+        f"[INIT 1] from_pretrained: {time.time() - t:.2f}s"
+    )
+
+
+    t = time.time()
+
+    logger.info("[INIT 2] Moving model to device")
+
+    model = model.to(
+        device=device,
+        dtype=precision
+    )
+
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+
+    logger.info(
+        f"[INIT 2] model.to(): {time.time() - t:.2f}s"
+    )
+
+
+    t = time.time()
+
+    logger.info("[INIT 3] Creating fixed tensors")
+
+    model.fixed_temperature = torch.tensor(
+        0.7,
+        device=device,
+        dtype=torch.float
+    )
+
+    model.fixed_top_p = torch.tensor(
+        0.7,
+        device=device,
+        dtype=torch.float
+    )
+
+    model.fixed_repetition_penalty = torch.tensor(
+        1.5,
+        device=device,
+        dtype=torch.float
+    )
+
+    logger.info(
+        f"[INIT 3] fixed tensors: {time.time() - t:.2f}s"
+    )
+
+
+    t = time.time()
+
+    logger.info("[INIT 4] Setting cache flag")
+
     model._cache_setup_done = False
 
+    logger.info(
+        f"[INIT 4] cache flag: {time.time() - t:.2f}s"
+    )
+
+
+    t = time.time()
+
     if compile:
-        logger.info("Compiling function...")
+        logger.info("[INIT 5] Creating torch.compile wrapper")
+
         decode_one_token = torch.compile(
             decode_one_token,
             backend="inductor" if torch.cuda.is_available() else "aot_eager",
@@ -481,43 +605,9 @@ def init_model(checkpoint_path, device, precision, compile=False):
             dynamic=True,
         )
 
-    #new start
-    # if compile:
-    #     logger.info("Compiling model forward functions separately...")
-
-    #     compile_backend = "inductor" if torch.cuda.is_available() else "aot_eager"
-    #     compile_mode = "default" if torch.cuda.is_available() else None
-
-    #     model.forward_generate = torch.compile(
-    #         model.forward_generate,
-    #         backend=compile_backend,
-    #         mode=compile_mode,
-    #         fullgraph=True,
-    #         dynamic=True,
-    #     )
-
-    #     # model.forward_generate_fast = torch.compile(
-    #     #     model.forward_generate_fast,
-    #     #     backend=compile_backend,
-    #     #     mode=compile_mode,
-    #     #     fullgraph=True,
-    #     #     dynamic=True,
-    #     # )
-
-    #     decode_one_token = decode_one_token_ar
-    #new end
-
-    #new start
-    # if compile:
-    #     logger.info("Compiling function...")
-    #     decode_one_token = torch.compile(
-    #         decode_one_token,
-    #         backend="inductor" if torch.cuda.is_available() else "aot_eager",
-    #         mode="default" if torch.cuda.is_available() else None,
-    #         fullgraph=False,
-    #         dynamic=True,
-    #     )
-    # new end
+    logger.info(
+        f"[INIT 5] torch.compile wrapper: {time.time() - t:.2f}s"
+    )
 
     return model.eval(), decode_one_token
 
@@ -1037,6 +1127,9 @@ def main(
     model, decode_one_token = init_model(
         checkpoint_path, device, precision, compile=compile
     )
+    logger.info("[CACHE] Starting setup_caches")
+    t = time.time()
+
     with torch.device(device):
         model.setup_caches(
             max_batch_size=1,
@@ -1045,6 +1138,11 @@ def main(
         )
     if torch.cuda.is_available():
         torch.cuda.synchronize()
+
+    
+    logger.info(
+    f"[CACHE] setup_caches: {time.time() - t:.2f}s"
+    )
 
     logger.info(f"Time to load model: {time.time() - t0:.02f} seconds")
 
