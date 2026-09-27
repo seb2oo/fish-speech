@@ -7,37 +7,19 @@ TARGET = Path(
 
 BACKUP = TARGET.with_suffix(".py.backup_force_aot_cache_save")
 
-OLD = """        if cache_info is not None:
-            if hasattr(compiled_fw, "_fx_graph_cache_key"):
-                compiled_fw = AOTAutogradCache.make_entry(
-                    compiled_fw,
-                    None,
-                    cache_info,
-                    updated_flat_args,
-                )
-                AOTAutogradCache.save(
-                    cache_info.cache_key,
-                    compiled_fw,
-                    remote=should_use_remote_autograd_cache(),
-                )
+OLD = """    cache_info = aot_config.cache_info
+    if cache_info is not None:
+        if hasattr(compiled_fw, "_fx_graph_cache_key"):
+            time_taken_ns = time.time_ns() - cache_info.start_time_ns
 """
 
-NEW = """        if cache_info is not None:
-            compiled_fw = AOTAutogradCache.make_entry(
-                compiled_fw,
-                None,
-                cache_info,
-                updated_flat_args,
-            )
-            AOTAutogradCache.save(
-                cache_info.cache_key,
-                compiled_fw,
-                remote=should_use_remote_autograd_cache(),
-            )
+NEW = """    cache_info = aot_config.cache_info
+    if cache_info is not None:
+        time_taken_ns = time.time_ns() - cache_info.start_time_ns
 """
 
 if not TARGET.exists():
-    raise FileNotFoundError(f"Target not found: {TARGET}")
+    raise FileNotFoundError(TARGET)
 
 source = TARGET.read_text()
 
@@ -51,8 +33,7 @@ if OLD in source:
     ast.parse(patched)
     TARGET.write_text(patched)
 
-    print("[OK] Forced AOTAutograd cache save")
-    print("[OK] Removed _fx_graph_cache_key gate")
+    print("[OK] Removed _fx_graph_cache_key save gate")
     print("[OK] Syntax check passed")
 
 elif NEW in source:
@@ -60,6 +41,6 @@ elif NEW in source:
 
 else:
     raise RuntimeError(
-        "Expected AOT cache-save block not found. "
-        "PyTorch source may differ from expected version."
+        "Expected AOT cache block not found. "
+        "PyTorch source may have changed."
     )
