@@ -42,4 +42,3 @@ else:
         "Expected use_cache block not found. "
         "PyTorch source may have changed."
     )
-PY
