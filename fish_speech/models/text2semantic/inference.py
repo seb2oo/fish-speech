@@ -811,7 +811,34 @@ def generate_long(
                 top_k=top_k,
             )
 
+            # if sample_idx == 0 and batch_idx == 0 and compile:
+            #     logger.info(f"Compilation time: {time.perf_counter() - t0:.2f} seconds")
             if sample_idx == 0 and batch_idx == 0 and compile:
+                # Save PyTorch Mega-Cache after the first compilation
+                try:
+                    MEGACACHE_PATH = Path("/app/megacache.pt")
+                    if not MEGACACHE_PATH.exists():
+                        artifacts = torch.compiler.save_cache_artifacts()
+
+                        if artifacts is not None:
+                            artifact_bytes, cache_info = artifacts
+
+                            cache_path = "/app/megacache.pt"
+                            with open(cache_path, "wb") as f:
+                                f.write(artifact_bytes)
+
+                            logger.info(
+                                f"[MEGACACHE] Saved {len(artifact_bytes) / 1024 / 1024:.2f} MB "
+                                f"to {cache_path}"
+                            )
+                            logger.info(f"[MEGACACHE] Info: {cache_info}")
+                        else:
+                            logger.warning("[MEGACACHE] No artifacts returned!")
+                    else:
+                        print("[MEGACACHE] already existed")
+
+                except Exception:
+                    logger.exception("[MEGACACHE] Failed to save cache artifacts")
                 logger.info(f"Compilation time: {time.perf_counter() - t0:.2f} seconds")
 
             if torch.cuda.is_available():

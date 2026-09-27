@@ -14,7 +14,7 @@ from fish_speech.models.text2semantic.inference import (
 )
 
 
-create_mega_cache = False
+create_mega_cache = True
 use_torch_inductor_cache = True
 
 
