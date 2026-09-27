@@ -107,12 +107,20 @@ def decode_one_token_ar(
     previous_tokens: Optional[torch.Tensor] = None,
     kv_len: Optional[int] = None,
 ) -> torch.Tensor:
+
+    _profile_t0 = time.perf_counter()
     forward_result = model.forward_generate(
         x,
         input_pos,
         audio_masks=audio_masks,
         audio_parts=audio_parts,
         kv_len=kv_len,
+    )
+    _profile_t1 = time.perf_counter()
+    print(
+        f"[PROFILE DECODE] forward_generate: "
+        f"{_profile_t1 - _profile_t0:.6f}s",
+        flush=True,
     )
     logits = forward_result.logits  # (1, 1, vocab_size)
     hidden_states = forward_result.hidden_states
@@ -149,7 +157,14 @@ def decode_one_token_ar(
     codebooks = [main_token_normal]
 
     input_pos = torch.tensor([0], device=hidden_states.device, dtype=torch.long)
+    _profile_t2 = time.perf_counter()
     model.forward_generate_fast(hidden_states, input_pos)
+    _profile_t3 = time.perf_counter()
+    print(
+        f"[PROFILE DECODE] first forward_generate_fast: "
+        f"{_profile_t3 - _profile_t2:.6f}s",
+        flush=True,
+    )
 
     a = codebooks[0] - model.config.semantic_begin_id
     a = torch.clamp(a, min=0, max=model.config.codebook_size - 1)

@@ -569,7 +569,7 @@ python3 -c "import os; from torch._inductor import codecache; print('ENV:',os.en
 # un des patch principale qui nous a permit d'isoler le soucis (a ne pas re-excuster)
 python3 patch_pytorch_megacache.py
 
-# le code qui normalment nous permt de descendre le temps de chargment encore plus 
+# le code qui normalment nous permt de descendre le temps de chargment encore plus (garder un des graphe AOT en cache !)
 python3 patch_remove_tensor_aot_bypass.py
 
 # nous permet d'enlever le patch ci dessus
@@ -627,3 +627,44 @@ grep -E 'Total generation|Compilation time|\[PROFILE\]|\[RECHECK\]' /app/create_
 echo "BENCHMARKS: $(grep -c '\[AUTO-TRACE-CALLFUNC\] BENCHMARK' /app/create_cache.log) | CACHED: $(grep -c '\[AUTO-TRACE-CALLFUNC\] CACHED' /app/create_cache.log) | LOOKUPS: $(grep -c '\[AUTO-TRACE-CALLFUNC\] LOOKUP' /app/create_cache.log)"
 
 echo "===== LOG ====="; grep -E 'Total generation|Compilation time|\[PROFILE\]|\[RECHECK\]' /app/create_cache.log; echo "BENCHMARKS: $(grep -c '\[AUTO-TRACE-CALLFUNC\] BENCHMARK' /app/create_cache.log) | CACHED: $(grep -c '\[AUTO-TRACE-CALLFUNC\] CACHED' /app/create_cache.log) | LOOKUPS: $(grep -c '\[AUTO-TRACE-CALLFUNC\] LOOKUP' /app/create_cache.log)"; echo; echo "===== INDUCTOR CACHE ====="; du -sh /app/torchinductor-cache 2>/dev/null; du -sh /app/torchinductor-cache/* 2>/dev/null | sort -h; echo "FXGRAPH FILES: $(find /app/torchinductor-cache/fxgraph -type f 2>/dev/null | wc -l)"; echo "TRITON FILES: $(find /app/torchinductor-cache/triton -type f 2>/dev/null | wc -l)"; echo; echo "===== MEGACACHE ====="; stat -c 'File: %n | Size: %s bytes | Modified: %y' /app/megacache.pt 2>/dev/null || echo "megacache.pt ABSENT"
+
+
+
+# comme a chque fois que l'on modifie un fichier source de pytorch, il faut alors refaire complement la compilation et c'est ennuyeux ! Ceci est un outils dedié de debuggage !
+
+python3 -m pip install --no-cache-dir --break-system-packages tlparse
+TORCH_TRACE="/tmp/tracedir" python3 fill_pytorch_compile2.py 2>&1 | tee /app/torch_trace.log
+
+
+
+# le codes ci-dessous, nous permettent de forcer la sauvegarde du deuxième graphe en cache .
+patch_enable_fx_cache_aot.py
+patch_force_aot_cache_save.py
+patch_retry_aot_on_tensorify_restart.py
+
+
+
+*********
+*********
+*********
+
+Donc les 4 patches à conserver sont bien :
+
+(patch_remove_tensor_aot_bypass.py)
+1 → inference.py : supprime le bypass torch.tensor()
+
+(patch_enable_fx_cache_aot.py)
+2 → compile_fx.py : autorise FX Graph Cache en AOT
+
+(patch_force_aot_cache_save.py)
+3 → jit_compile_runtime_wrappers.py : autorise le save AOT sans _fx_graph_cache_key
+
+(patch_retry_aot_on_tensorify_restart.py)
+4 → common.py : intercepte le restart Tensorify et relance AOT immédiatement
+
+Et nos résultats ont confirmé que l'ensemble donne bien :
+
+[0/0] AOTAutograd cache hit
+Semantic generation: ~33 s
+Semantic generation: ~5 s
+Semantic generation: ~6 s
