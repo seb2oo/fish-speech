@@ -453,6 +453,326 @@ BASIC_TESTS = [
 
 ]
 
+AVATAR_TAGS = [
+
+    # ============================================================
+    # NATURAL / CONVERSATIONAL — HIGH PRIORITY
+    # ============================================================
+
+    "[natural conversational tone]",
+    "[warm and natural conversational tone]",
+    "[friendly and relaxed conversational tone]",
+    "[casual and spontaneous tone]",
+    "[warm tone]",
+    "[friendly tone]",
+    "[calm tone]",
+    "[relaxed tone]",
+    "[confident but relaxed tone]",
+    "[professional but approachable tone]",
+
+    # ============================================================
+    # EMOTIONS — HIGH PRIORITY
+    # ============================================================
+
+    "[happy]",
+    "[excited]",
+    "[excited but still natural]",
+    "[amused]",
+    "[slightly amused]",
+    "[sad]",
+    "[worried]",
+    "[slightly worried]",
+    "[nervous]",
+    "[slightly nervous but trying to stay confident]",
+    "[surprised]",
+    "[genuinely surprised]",
+    "[angry]",
+    "[frustrated]",
+    "[confused]",
+    "[serious but still warm and approachable]",
+    "[thoughtful]",
+    "[curious and engaged]",
+
+    # ============================================================
+    # HUMAN REACTIONS
+    # ============================================================
+
+    "[laughing]",
+    "[chuckling]",
+    "[laughing softly and naturally]",
+    "[sigh]",
+    "[inhale]",
+    "[exhale]",
+    "[clearing throat]",
+
+    # ============================================================
+    # RHYTHM / PAUSES
+    # ============================================================
+
+    "[pause]",
+    "[short pause]",
+    "[long pause]",
+    "[pause briefly as if thinking]",
+    "[slight hesitation before answering]",
+    "[speaking slowly]",
+
+    # ============================================================
+    # VOICE / DELIVERY
+    # ============================================================
+
+    "[whisper]",
+    "[soft voice]",
+    "[low voice]",
+    "[loud]",
+    "[emphasis]",
+    "[natural voice with a slight smile]",
+    "[calm and reassuring voice]",
+    "[answer naturally as if speaking to a friend]",
+]
+
+
+# ================================================================
+# OTHER USEFUL TAGS / FREE-FORM EXPRESSIONS
+# Kept here for future testing, but NOT part of the 50 core tags.
+# ================================================================
+
+# --- Natural / conversational ---
+# "[gentle tone]"
+# "[neutral tone]"
+# "[casual tone]"
+# "[confident tone]"
+# "[professional tone]"
+# "[reassuring tone]"
+# "[empathetic tone]"
+# "[playful tone]"
+# "[teasing tone]"
+# "[welcoming tone]"
+
+# --- Emotions ---
+# "[delighted]"
+# "[enthusiastic]"
+# "[delight]"
+# "[disappointed]"
+# "[shocked]"
+# "[relieved]"
+# "[concerned tone]"
+# "[comforting tone]"
+# "[quietly disappointed]"
+# "[gently concerned]"
+# "[calm but slightly excited]"
+# "[happy and enthusiastic]"
+# "[reassuring and empathetic]"
+# "[serious and thoughtful]"
+# "[surprised but genuinely happy]"
+
+# --- Human reactions ---
+# "[chuckle]"
+# "[tsk]"
+# "[deep sigh]"
+# "[yawning]"
+# "[groaning]"
+# "[panting]"
+# "[moaning]"
+# "[audience laughter]"
+# "[quiet laugh]"
+# "[slight amused laugh]"
+# "[a brief natural chuckle]"
+# "[take a small breath before speaking]"
+# "[slight sigh before continuing]"
+
+# --- Thinking / conversational behavior ---
+# "[hesitating]"
+# "[thinking]"
+# "[thoughtful pause]"
+# "[dramatic pause]"
+# "[thinking aloud]"
+# "[explaining clearly]"
+# "[explaining this clearly and patiently]"
+# "[answering thoughtfully]"
+# "[clarifying]"
+# "[correcting myself]"
+# "[asking a question]"
+# "[answering confidently]"
+# "[sound genuinely interested in the conversation]"
+# "[sound thoughtful and reflective]"
+# "[sound reassuring and sincere]"
+
+# --- Pace ---
+# "[slowly]"
+# "[speaking quickly]"
+# "[fast-paced]"
+# "[slightly slower and more deliberate]"
+# "[slightly faster and more energetic]"
+# "[dynamic conversational delivery]"
+
+# --- Volume / voice ---
+# "[very soft voice]"
+# "[low volume]"
+# "[quietly]"
+# "[loud voice]"
+# "[shouting]"
+# "[screaming]"
+# "[volume up]"
+# "[volume down]"
+# "[soft and intimate delivery]"
+# "[lower the voice for a more intimate moment]"
+# "[raise the energy gradually]"
+
+# --- Intonation / emphasis ---
+# "[strong emphasis]"
+# "[slight emphasis]"
+# "[dramatic emphasis]"
+# "[questioning tone]"
+# "[uncertain tone]"
+# "[reassuring tone]"
+# "[subtle emotional emphasis]"
+# "[strong emphasis on the important words]"
+# "[build excitement gradually]"
+
+# --- Advanced free-form combinations ---
+# "[warm, friendly and slightly amused]"
+# "[calm, thoughtful and reassuring]"
+# "[excited, energetic and spontaneous]"
+# "[slightly tired but still friendly]"
+# "[curious, engaged and enthusiastic]"
+# "[empathetic and gently reassuring]"
+# "[playful and slightly teasing]"
+# "[serious but friendly]"
+# "[confident but not arrogant]"
+# "[enthusiastic without exaggerating]"
+# "[speak spontaneously without sounding rehearsed]"
+# "[speak naturally as if telling a story]"
+# "[tell this like a personal story]"
+
+
+BASIC_TESTS = [
+
+    # ============================================================
+    # 1. NATURAL / CONVERSATIONAL
+    # ============================================================
+
+    (
+        "[natural conversational tone] "
+        "Hey, how are you doing today? "
+        "[warm and natural conversational tone] "
+        "It's really nice to talk with you. "
+        "[friendly and relaxed conversational tone] "
+        "Let's just have a relaxed conversation.",
+        "avatar_test_01_natural.wav",
+    ),
+
+    # ============================================================
+    # 2. EMOTIONS
+    # ============================================================
+
+    (
+        "[happy] "
+        "I'm really happy to hear that! "
+        "[excited] "
+        "That's amazing! I can't wait to see what happens next. "
+        "[slightly amused] "
+        "Well, that's actually pretty funny. "
+        "[sad] "
+        "I'm sorry, that's really unfortunate. "
+        "[worried] "
+        "I'm a little concerned about what might happen. "
+        "[surprised] "
+        "Wait, really? I didn't expect that at all! "
+        "[angry] "
+        "That's not acceptable. We need to fix this. "
+        "[thoughtful] "
+        "Let me think about that for a moment.",
+        "avatar_test_02_emotions.wav",
+    ),
+
+    # ============================================================
+    # 3. HUMAN REACTIONS
+    # ============================================================
+
+    (
+        "Well... [pause] "
+        "[inhale] let me think about that. "
+        "[slight hesitation before answering] "
+        "Hmm, I'm not completely sure. "
+        "[laughing softly and naturally] "
+        "Actually, that's kind of funny. "
+        "[chuckling] "
+        "Yeah, I didn't see that coming. "
+        "[sigh] "
+        "Anyway, let's keep going. "
+        "[clearing throat] "
+        "Right, where were we?",
+        "avatar_test_03_reactions.wav",
+    ),
+
+    # ============================================================
+    # 4. RHYTHM / PAUSES
+    # ============================================================
+
+    (
+        "[speaking slowly] "
+        "Let me explain this carefully. "
+        "[short pause] "
+        "There are a few important things to consider. "
+        "[pause briefly as if thinking] "
+        "First... "
+        "[long pause] "
+        "we need to understand the problem. "
+        "[slight hesitation before answering] "
+        "And then, I think, we can find a solution.",
+        "avatar_test_04_rhythm.wav",
+    ),
+
+    # ============================================================
+    # 5. VOICE / DELIVERY
+    # ============================================================
+
+    (
+        "[whisper] "
+        "Let me tell you a little secret. "
+        "[soft voice] "
+        "Nobody else needs to hear this. "
+        "[low voice] "
+        "So listen carefully. "
+        "[loud] "
+        "And now, everyone can hear me! "
+        "[emphasis] "
+        "This is really important. "
+        "[natural voice with a slight smile] "
+        "But don't worry, everything is going to be fine. "
+        "[calm and reassuring voice] "
+        "You can take your time. "
+        "[answer naturally as if speaking to a friend] "
+        "There's no need to rush.",
+        "avatar_test_05_voice.wav",
+    ),
+
+    # ============================================================
+    # 6. MIXED — REAL AVATAR CONVERSATION
+    # ============================================================
+
+    (
+        "[natural conversational tone] "
+        "So, you want to know what I think? "
+        "[pause briefly as if thinking] "
+        "Hmm... give me a second. "
+        "[thoughtful] "
+        "I think it's actually a pretty interesting idea. "
+        "[slightly amused] "
+        "Although, I'm not going to lie, "
+        "[slight hesitation before answering] "
+        "I was a little surprised when you first mentioned it. "
+        "[excited but still natural] "
+        "But the more I think about it, the more I like it. "
+        "[calm and reassuring voice] "
+        "So yes, I think we should give it a try. "
+        "[warm and natural conversational tone] "
+        "What do you think?",
+        "avatar_test_06_mixed.wav",
+    ),
+
+]
+
 
 # ============================================================
 # EXTENDED TESTS
