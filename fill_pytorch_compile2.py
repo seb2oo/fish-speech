@@ -35,6 +35,7 @@ CODEC_CHECKPOINT = CHECKPOINT / "codec.pth"
 # choose the one you need to make test
 REFERENCE_AUDIO = Path("/app/fish-speech/input/fr.wav")
 REFERENCE_AUDIO = Path("/app/fish-speech/input/en.wav")
+REDO_REF=True
 
 OUTPUT_DIR = Path("/app/fish-speech/output")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -153,7 +154,8 @@ print("=" * 80)
 
 REFERENCE_CODES_PATH = OUTPUT_DIR / "reconstructed.npy"
 
-if REFERENCE_CODES_PATH.exists():
+
+if REFERENCE_CODES_PATH.exists() and not REDO_REF:
 
     print(f"Using cached reference codes: {REFERENCE_CODES_PATH}")
 
