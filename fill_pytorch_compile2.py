@@ -15,6 +15,7 @@ from fish_speech.models.text2semantic.inference import (
 
 
 create_mega_cache = True
+use_mega_cache = False
 use_torch_inductor_cache = True
 
 
@@ -62,31 +63,32 @@ PROMPT_TEXT = (
 
 MEGACACHE_PATH = Path("/app/megacache.pt")
 
-if MEGACACHE_PATH.exists():
-    print("=" * 80)
-    print("LOADING MEGACACHE")
-    print("=" * 80)
+if use_mega_cache :
+    if MEGACACHE_PATH.exists():
+        print("=" * 80)
+        print("LOADING MEGACACHE")
+        print("=" * 80)
 
-    t0 = time.perf_counter()
+        t0 = time.perf_counter()
 
-    artifact_bytes = MEGACACHE_PATH.read_bytes()
+        artifact_bytes = MEGACACHE_PATH.read_bytes()
 
-    cache_info = torch.compiler.load_cache_artifacts(
-        artifact_bytes
-    )
+        cache_info = torch.compiler.load_cache_artifacts(
+            artifact_bytes
+        )
 
-    print("[MEGACACHE] INDUCTOR CACHE:", cache_info.artifacts.get("inductor"))
-    print("[MEGACACHE] AUTOTUNE COUNT:", len(cache_info.artifacts.get("autotune", [])))
+        print("[MEGACACHE] INDUCTOR CACHE:", cache_info.artifacts.get("inductor"))
+        print("[MEGACACHE] AUTOTUNE COUNT:", len(cache_info.artifacts.get("autotune", [])))
 
-    print(
-        f"[MEGACACHE] Loaded "
-        f"{len(artifact_bytes) / 1024 / 1024:.2f} MB "
-        f"in {time.perf_counter() - t0:.2f}s"
-    )
+        print(
+            f"[MEGACACHE] Loaded "
+            f"{len(artifact_bytes) / 1024 / 1024:.2f} MB "
+            f"in {time.perf_counter() - t0:.2f}s"
+        )
 
-    print(f"[MEGACACHE] INFO: {cache_info}")
-else:
-    print("[MEGACACHE] No cache file found")
+        print(f"[MEGACACHE] INFO: {cache_info}")
+    else:
+        print("[MEGACACHE] No cache file found")
 
 
 # ============================================================
