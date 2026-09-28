@@ -134,10 +134,16 @@ def decode_one_token_ar(
     )[0]
 
     # RAS: also sample with high temp to use as fallback if token repeats
-    high_temp = torch.tensor(
-        RAS_HIGH_TEMP, device=temperature.device, dtype=temperature.dtype
+    # high_temp = torch.tensor(
+    #     RAS_HIGH_TEMP, device=temperature.device, dtype=temperature.dtype
+    # )
+    high_temp = torch.full_like(
+        temperature, RAS_HIGH_TEMP
     )
-    high_top_p = torch.tensor(RAS_HIGH_TOP_P, device=top_p.device, dtype=top_p.dtype)
+    # high_top_p = torch.tensor(RAS_HIGH_TOP_P, device=top_p.device, dtype=top_p.dtype)
+    high_top_p = torch.full_like(
+        top_p, RAS_HIGH_TOP_P
+    )
     main_token_high = sample(
         biased_logits, temperature=high_temp, top_p=high_top_p, top_k=top_k
     )[0]
@@ -156,7 +162,10 @@ def decode_one_token_ar(
 
     codebooks = [main_token_normal]
 
-    input_pos = torch.tensor([0], device=hidden_states.device, dtype=torch.long)
+    # input_pos = torch.tensor([0], device=hidden_states.device, dtype=torch.long)
+    input_pos = torch.zeros(
+        1, device=hidden_states.device, dtype=torch.long
+    )
     # _profile_t2 = time.perf_counter()
     model.forward_generate_fast(hidden_states, input_pos)
     # _profile_t3 = time.perf_counter()
@@ -173,8 +182,14 @@ def decode_one_token_ar(
     codebooks.append(a)
 
     for codebook_idx in range(1, model.config.num_codebooks):
-        input_pos = torch.tensor(
-            [codebook_idx], device=hidden_states.device, dtype=torch.long
+        # input_pos = torch.tensor(
+        #     [codebook_idx], device=hidden_states.device, dtype=torch.long
+        # )
+        input_pos = torch.full(
+            (1,),
+            codebook_idx,
+            device=hidden_states.device,
+            dtype=torch.long,
         )
         logits = model.forward_generate_fast(hidden_states, input_pos)
 
