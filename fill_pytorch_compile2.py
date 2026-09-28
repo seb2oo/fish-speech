@@ -32,7 +32,9 @@ logging.getLogger("torch._functorch._aot_autograd.autograd_cache").setLevel(logg
 CHECKPOINT = Path("/app/checkpoints/s2-pro")
 CODEC_CHECKPOINT = CHECKPOINT / "codec.pth"
 
+# choose the one you need to make test
 REFERENCE_AUDIO = Path("/app/fish-speech/input/fr.wav")
+REFERENCE_AUDIO = Path("/app/fish-speech/input/en.wav")
 
 OUTPUT_DIR = Path("/app/fish-speech/output")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -51,12 +53,20 @@ RUN_EXTENDED_TESTS_V2 = False
 # False = fait les générations mais ne conserve pas les WAV
 SAVE_AUDIO = True
 
+# choose the one you need to make test
 PROMPT_TEXT = (
     "Le rire d'un proche a le pouvoir d'effacer mes soucis. "
     "Il éclate comme une lumière claire et me remplit de joie. "
     "Dans ces instants, tout semble plus léger, "
     "et je retrouve confiance en l'avenir."
 )
+PROMPT_TEXT = (
+    "This system converts written text into natural-sounding speech. "
+    "Each word is processed, analyzed for context, and generated with the correct intonation. "
+    "The goal is to make digital voices sound as close to human conversation as possible."
+)
+
+
 
 # ============================================================
 # MEGA CACHE
@@ -359,7 +369,7 @@ def generate_voice(text: str, output_path: Path):
 # ============================================================
 # BASIC TESTS
 # ============================================================
-
+# choose the one needed
 BASIC_TESTS = [
 
     (
@@ -374,6 +384,24 @@ BASIC_TESTS = [
 
     (
         "Si tout fonctionne correctement, le modèle reste chargé en mémoire entre les générations.",
+        "persistent_test_3.wav",
+    ),
+]
+
+BASIC_TESTS = [
+
+    (
+        "Hello, this is the first test of speech generation with my cloned voice.",
+        "persistent_test_1.wav",
+    ),
+
+    (
+        "Now we are testing a second generation without reloading the model.",
+        "persistent_test_2.wav",
+    ),
+
+    (
+        "If everything works correctly, the model should remain loaded in memory between generations.",
         "persistent_test_3.wav",
     ),
 ]
