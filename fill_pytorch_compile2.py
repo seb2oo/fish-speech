@@ -408,6 +408,51 @@ BASIC_TESTS = [
     ),
 ]
 
+BASIC_TESTS = [
+
+    (
+        "[professional broadcast tone] Hello everyone, "
+        "[pause] today we are going to demonstrate several different speaking styles. "
+        "[low volume] First, let me speak quietly for a moment. "
+        "[whisper] This is a soft whisper, almost like a secret. "
+        "[low voice] Now I will lower my voice even further. "
+        "[volume up] And now I will gradually increase the volume. "
+        "[loud] This is a loud voice. "
+        "[shouting] And this is me shouting across the room! "
+        "[screaming] And this is a much more intense scream! "
+        "[volume down] Now I will bring the volume back down. "
+        "[sad] Sometimes things do not go the way we expect. "
+        "[sigh] It can be disappointing. "
+        "[exhale] Let me take a breath and continue. "
+        "[inhale] [short pause] "
+        "[surprised] Oh, wait, I did not expect that! "
+        "[shocked] I am completely shocked by what just happened. "
+        "[angry] That is absolutely unacceptable! "
+        "[emphasis] I said, this is very important. "
+        "[excited] But there is also some really exciting news! "
+        "[excited tone] I cannot wait to tell you about it. "
+        "[delight] This is such a wonderful surprise! "
+        "[laughing] Ha ha ha, that is actually hilarious! "
+        "[laughing tone] I can barely keep myself from laughing. "
+        "[chuckle] Heh, that was a good one. "
+        "[chuckling] I am still chuckling about it. "
+        "[tsk] Tsk, tsk, I really should have known better. "
+        "[clearing throat] Ahem, let us get back to the subject. "
+        "[interrupting] Wait, wait, let me stop you there for a second. "
+        "[pause] "
+        "[panting] I have been running all morning, and I am completely out of breath. "
+        "[moaning] Ohhh, that was harder than I expected. "
+        "[singing] La la la, everything is going wonderfully today. "
+        "[echo] Hello... hello... can you hear me? "
+        "[audience laughter] "
+        "[with strong accent] This sentence should sound noticeably different because of the accent. "
+        "[pitch up] Now let us raise the pitch and make the voice sound higher. "
+        "[professional broadcast tone] And finally, thank you very much for listening to this demonstration.",
+        "persistent_all_tags_test.wav",
+    ),
+
+]
+
 
 # ============================================================
 # EXTENDED TESTS
