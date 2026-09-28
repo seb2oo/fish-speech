@@ -35,6 +35,8 @@ CODEC_CHECKPOINT = CHECKPOINT / "codec.pth"
 # choose the one you need to make test
 REFERENCE_AUDIO = Path("/app/fish-speech/input/fr.wav")
 REFERENCE_AUDIO = Path("/app/fish-speech/input/en.wav")
+REFERENCE_AUDIO = Path("/app/fish-speech/input/es.wav")
+# REFERENCE_AUDIO = Path("/app/fish-speech/input/de.wav")
 REDO_REF=True
 
 OUTPUT_DIR = Path("/app/fish-speech/output")
@@ -66,6 +68,19 @@ PROMPT_TEXT = (
     "Each word is processed, analyzed for context, and generated with the correct intonation. "
     "The goal is to make digital voices sound as close to human conversation as possible."
 )
+
+PROMPT_TEXT = (
+    "Camino por la playa temprano en la mañana. "
+    "El sonido de las olas acompaña mis pasos y las gaviotas vuelan sobre mi cabeza. "
+    "A veces me detengo a recoger una concha brillante. "
+    "Estos instantes me llenan de calma antes de que empiece el día."
+)
+
+# PROMPT_TEXT = (
+#     "Dieses System wandelt geschriebenen Text in natürlich klingende Sprache um. "
+#     "Jede Eingabe wird analysiert, der Kontext berücksichtigt und die richtige Betonung erzeugt. "
+#     "Ziel ist es, digitale Stimmen so menschlich wie möglich klingen zu lassen."
+# )
 
 
 
@@ -772,6 +787,45 @@ BASIC_TESTS = [
     ),
 
 ]
+
+
+BASIC_TESTS= [
+
+    (
+        "Hola, esta es la primera prueba de generación de voz con mi voz clonada.",
+        "persistent_test_es_1.wav",
+    ),
+
+    (
+        "Ahora estamos realizando una segunda generación sin volver a cargar el modelo.",
+        "persistent_test_es_2.wav",
+    ),
+
+    (
+        "Si todo funciona correctamente, el modelo debería permanecer cargado en memoria entre las diferentes generaciones.",
+        "persistent_test_es_3.wav",
+    ),
+]
+
+
+
+# BASIC_TESTS= [
+
+#     (
+#         "Hallo, dies ist der erste Test der Sprachgenerierung mit meiner geklonten Stimme.",
+#         "persistent_test_de_1.wav",
+#     ),
+
+#     (
+#         "Jetzt testen wir eine zweite Sprachgenerierung, ohne das Modell erneut zu laden.",
+#         "persistent_test_de_2.wav",
+#     ),
+
+#     (
+#         "Wenn alles korrekt funktioniert, sollte das Modell zwischen den verschiedenen Generierungen im Speicher geladen bleiben.",
+#         "persistent_test_de_3.wav",
+#     ),
+# ]
 
 
 # ============================================================
