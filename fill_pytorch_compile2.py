@@ -34,7 +34,7 @@ CODEC_CHECKPOINT = CHECKPOINT / "codec.pth"
 
 # choose the one you need to make test
 REFERENCE_AUDIO = Path("/app/fish-speech/input/fr.wav")
-# REFERENCE_AUDIO = Path("/app/fish-speech/input/en.wav")
+REFERENCE_AUDIO = Path("/app/fish-speech/input/en.wav")
 # REFERENCE_AUDIO = Path("/app/fish-speech/input/es.wav")
 # REFERENCE_AUDIO = Path("/app/fish-speech/input/de.wav")
 REDO_REF=True
@@ -63,11 +63,11 @@ PROMPT_TEXT = (
     "Dans ces instants, tout semble plus léger, "
     "et je retrouve confiance en l'avenir."
 )
-# PROMPT_TEXT = (
-#     "This system converts written text into natural-sounding speech. "
-#     "Each word is processed, analyzed for context, and generated with the correct intonation. "
-#     "The goal is to make digital voices sound as close to human conversation as possible."
-# )
+PROMPT_TEXT = (
+    "This system converts written text into natural-sounding speech. "
+    "Each word is processed, analyzed for context, and generated with the correct intonation. "
+    "The goal is to make digital voices sound as close to human conversation as possible."
+)
 
 # PROMPT_TEXT = (
 #     "Camino por la playa temprano en la mañana. "

@@ -14,6 +14,9 @@ import sys
 import contextlib
 
 from pathlib import Path
+import logging
+
+logging.getLogger("torch._functorch._aot_autograd.autograd_cache").setLevel(logging.INFO)
 
 # import time # not needed, log serveless do it
 
@@ -398,7 +401,8 @@ def bootstrap():
         print(
             "Encoding reference voice with DAC..."
         )
-        
+
+        # this command is slow ! Maybe better to use the one from fill_pytorch_compile2.py or already place the neccessary file into the git
         for ref in REFERENCE_WAV:
             language = Path(ref).stem
             output_path = os.path.join(
