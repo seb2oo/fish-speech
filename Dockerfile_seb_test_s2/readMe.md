@@ -328,10 +328,15 @@ fish-speech/
 ├── README.md
 └── ...
 
+# bien se mettre a la base de fish-speech pour accéder à son context !PS D:\Dev\06_FishSpeech\fish-speech> Le point "." situé juste après serverlessv9 sert justement à donner cet emplacement context !
 docker build `
     --platform linux/amd64 `
-    -f "Dockerfile[seb_test_s2]/Dockerfile" `
-    -t fish-speech-s2pro:cuda129 .
+    -f "Dockerfile_seb_test_s2/Dockerfile" `
+    -t seb2oo/fish-speech-s2pro:serverlessv9 .
+# bien garder le "seb2oo" avant le nom de mon projet car c'est mon nom utilisateur de docker hub. (car quand je récupere une image depuis runpod par exemple, je dois alors faire seb2oo/lesNomDeLimage) ! En tout cas c'est conseillé car pls pratique
+# Le tag ici "serverlessv9" est super utile car il permet de créer et d'améliorer une image sans devoir chaque fois changer son nom
+
+docker push seb2oo/fish-speech-s2pro:serverlessv9
 
 git switch -c docker
 git branch
@@ -569,7 +574,7 @@ python3 -c "import os; from torch._inductor import codecache; print('ENV:',os.en
 # un des patch principale qui nous a permit d'isoler le soucis (a ne pas re-excuster)
 python3 patch_pytorch_megacache.py
 
-# le code qui normalment nous permt de descendre le temps de chargment encore plus (garder un des graphe AOT en cache !)
+# le code qui normalment nous permt de descendre le temps de chargment encore plus (garder un des graphe AOT en cache !)# integrer dans le code mnt, plus besoin de l'appliquer
 python3 patch_remove_tensor_aot_bypass.py
 
 # nous permet d'enlever le patch ci dessus
@@ -638,9 +643,9 @@ TORCH_TRACE="/tmp/tracedir" python3 fill_pytorch_compile2.py 2>&1 | tee /app/tor
 
 
 # le codes ci-dessous, nous permettent de forcer la sauvegarde du deuxième graphe en cache .
-patch_enable_fx_cache_aot.py
-patch_force_aot_cache_save.py
-patch_retry_aot_on_tensorify_restart.py
+python3 patch_enable_fx_cache_aot.py
+python3 patch_force_aot_cache_save.py
+python3 patch_retry_aot_on_tensorify_restart.py
 
 
 
@@ -668,3 +673,25 @@ Et nos résultats ont confirmé que l'ensemble donne bien :
 Semantic generation: ~33 s
 Semantic generation: ~5 s
 Semantic generation: ~6 s
+
+
+********
+********
+********
+tous les fichiers patch_xxxx.py nous ont servi à améliorer le processus. Seuls les 3 patchs finaux seront utilisés
+
+fill_pytorch_compile.py --> fichier pour tester de simple inférence et leur temps d'initialisations en mode compilé ! pareil que test_persistent_old.py mais avec plus de test...
+mega_timer.y --> expliqué plus haut ...
+fill_pytorch_compile2.py --> test final qui test plus ou moins tout !
+Sinon en interne on a chnagé ceci : 
+text2semantic.inference.py et llama.py
+dac.modded_dac.py, rvq.py
+Donc ce n'est pas fait avec un patch car ca concerne le projet et ce sera toujours comme ca contrairement au patch pytorch
+les originaux restent dans le dossier aussi sous : leurNom[original]
+tout est expliqué dans OneNote chapitre :("travail N°4") (TTS serverless validation) N°2
+
+
+ je pense que la meilleure manière de faire un custom git est exactement comme j'ai fais : 
+ - on fork le git-
+ - on crée une nouvelle branche
+ - on ajoute ce que l'on désire et tout sera renseigné dans le dossier docker custom et on reste seulement dans cette branche jusqu'a la fin... (C'est ce readMe)

@@ -119,6 +119,7 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
 
 WORKDIR /app
 
+# local test with docker 
 RUN mkdir -p /app/torchinductor-cache
 
 # ============================================================
@@ -128,11 +129,17 @@ RUN mkdir -p /app/torchinductor-cache
 COPY Dockerfile_seb_test_s2/handler.py /app/handler.py
 
 
-## je le mets spécialemement ici pour ne pas reconstruire toute l'image
+## je le mets spécialemement ici pour ne pas reconstruire toute l'image 
+##(car je l'avais déjà seter plus haut, mais pour la version docker local et non serverless, et cette version est serverless)
 # test in serveless to get in un cache
 ENV TORCHINDUCTOR_CACHE_DIR=/runpod-volume/torchinductor-cache
 
-
+## je le mets spécialemement ici pour ne pas reconstruire toute l'image
+## patch pour de pytorch afin de récuperer les graphe AOT entre session lors du premier pytorch.complie
+## mais en fait même pas obliger de faire ça, car on fait un gitclone de toute facon avec le handler.py
+# COPY patch_enable_fx_cache_aot.py /app/
+# COPY patch_force_aot_cache_save.py /app/
+# COPY patch_retry_aot_on_tensorify_restart.py /app/
 
 # ============================================================
 # DEFAULT COMMAND (DOCKER)

@@ -13,6 +13,10 @@ import runpod
 import sys
 import contextlib
 
+from pathlib import Path
+
+# import time # not needed, log serveless do it
+
 
 # ============================================================
 # CONFIG
@@ -22,20 +26,55 @@ REPO_PATH = "/app/fish-speech"
 
 CHECKPOINT_PATH = "/app/checkpoints/s2-pro"
 
-REFERENCE_WAV = "/app/fish-speech/input/fr.wav"
-REFERENCE_TOKENS = "/app/fish-speech/output/reconstructed.npy"
+
+REFERENCE_WAV_FR = "/app/fish-speech/input/fr.wav"
+REFERENCE_TOKENS_FR = "/app/fish-speech/output/reconstructed_fr.npy"
+
+REFERENCE_WAV_EN = "/app/fish-speech/input/en.wav"
+REFERENCE_TOKENS_EN = "/app/fish-speech/output/reconstructed_en.npy"
+
+REFERENCE_WAV_ES = "/app/fish-speech/input/es.wav"
+REFERENCE_TOKENS_ES = "/app/fish-speech/output/reconstructed_es.npy"
+
+REFERENCE_WAV_DE = "/app/fish-speech/input/de.wav"
+REFERENCE_TOKENS_DE = "/app/fish-speech/output/reconstructed_de.npy"
+
+REFERENCE_TOKENS = [REFERENCE_TOKENS_FR,REFERENCE_TOKENS_EN,REFERENCE_TOKENS_ES,REFERENCE_TOKENS_DE]
+REFERENCE_WAV= [REFERENCE_WAV_FR,REFERENCE_WAV_EN,REFERENCE_WAV_ES,REFERENCE_WAV_DE]
 
 DEVICE = "cuda"
 PRECISION = torch.bfloat16
 
 COMPILE = True
 
-PROMPT_TEXT = (
+
+PROMPT_TEXT_FR = (
     "Le rire d'un proche a le pouvoir d'effacer mes soucis. "
     "Il éclate comme une lumière claire et me remplit de joie. "
     "Dans ces instants, tout semble plus léger, "
     "et je retrouve confiance en l'avenir."
 )
+
+PROMPT_TEXT_EN = (
+    "This system converts written text into natural-sounding speech. "
+    "Each word is processed, analyzed for context, and generated with the correct intonation. "
+    "The goal is to make digital voices sound as close to human conversation as possible."
+)
+
+PROMPT_TEXT_ES = (
+    "Camino por la playa temprano en la mañana. "
+    "El sonido de las olas acompaña mis pasos y las gaviotas vuelan sobre mi cabeza. "
+    "A veces me detengo a recoger una concha brillante. "
+    "Estos instantes me llenan de calma antes de que empiece el día."
+)
+
+
+PROMPT_TEXT_DE = (
+    "Dieses System wandelt geschriebenen Text in natürlich klingende Sprache um. "
+    "Jede Eingabe wird analysiert, der Kontext berücksichtigt und die richtige Betonung erzeugt. "
+    "Ziel ist es, digitale Stimmen so menschlich wie möglich klingen zu lassen."
+)
+
 
 TEMPERATURE = 0.7
 TOP_P = 0.7
@@ -44,6 +83,70 @@ REPETITION_PENALTY = 1.1
 
 CHUNK_LENGTH = 300
 
+
+# --------------------------------------------------------
+# TORCHINDUCTOR CACHE DIAGNOSTIC
+# --------------------------------------------------------
+def cache_diagnostics():
+    cache_dir = os.environ.get(
+        "TORCHINDUCTOR_CACHE_DIR",
+        "/runpod-volume/torchinductor-cache",
+    )
+
+    print("=" * 70)
+    print("TORCHINDUCTOR CACHE")
+    print("=" * 70)
+
+    print(
+        f"Cache directory: {cache_dir}"
+    )
+
+    if os.path.exists(cache_dir):
+
+        total_size = 0
+        file_count = 0
+
+        for root, dirs, files in os.walk(cache_dir):
+
+            for filename in files:
+
+                filepath = os.path.join(
+                    root,
+                    filename,
+                )
+
+                try:
+                    total_size += os.path.getsize(
+                        filepath
+                    )
+
+                    file_count += 1
+
+                except OSError:
+                    pass
+
+        print(
+            f"Cache exists: YES"
+        )
+
+        print(
+            f"Cache files: {file_count}"
+        )
+
+        print(
+            f"Cache size: "
+            f"{total_size / (1024 * 1024):.2f} MB"
+        )
+
+    else:
+
+        print(
+            "Cache exists: NO"
+        )
+
+    print("=" * 70)
+
+cache_diagnostics()
 
 # ============================================================
 # HELPERS
@@ -66,8 +169,6 @@ def run_command(command):
 # ============================================================
 # CACHED MODEL
 # ============================================================
-
-from pathlib import Path
 
 MODEL_ID = "fishaudio/s2-pro"
 
@@ -107,6 +208,21 @@ CHECKPOINT_PATH = find_cached_model(MODEL_ID)
 
 print("S2-Pro cached model found:")
 print(CHECKPOINT_PATH)
+
+# ============================================================
+# PULL GIT
+# ============================================================
+
+# run_command(
+#     f"rm -rf '{REPO_PATH}'"
+# )
+def pull_git():
+    print("Pulling Fish Speech repository...")
+
+    run_command(
+        f"cd '{REPO_PATH}' && git pull origin docker"
+    )
+
 
 # ============================================================
 # BOOTSTRAP
@@ -155,6 +271,7 @@ def bootstrap():
             "https://github.com/seb2oo/fish-speech.git "
             f"'{REPO_PATH}'"
         )
+        print("1")
 
     else:
 
@@ -172,7 +289,7 @@ def bootstrap():
         exist_ok=True,
     )
 
-
+    print("2")
     # Make Fish Speech available to this Python process
     if REPO_PATH not in sys.path:
         sys.path.insert(0, REPO_PATH)
@@ -180,16 +297,15 @@ def bootstrap():
     # --------------------------------------------------------
     # DOWNLOAD CHECKPOINT
     # --------------------------------------------------------
-
+    print("3")
     codec_path = os.path.join(
         CHECKPOINT_PATH,
         "codec.pth",
     )
 
     if not os.path.exists(codec_path):
-
+        ## not needed because we use the cache
         # print("Downloading S2-Pro checkpoint...")
-
         # run_command(
         #     "hf download fishaudio/s2-pro "
         #     "--local-dir /app/checkpoints/s2-pro"
@@ -203,54 +319,137 @@ def bootstrap():
         print(
             "S2-Pro checkpoint already exists."
         )
-
+    
+    
     # --------------------------------------------------------
     # CREATE REFERENCE TOKENS
     # --------------------------------------------------------
 
-    if not os.path.exists(REFERENCE_TOKENS):
+    ## WAS USEFULL ONLY WHEN WE TRIED ONLY ON LANGUAGE
+    # if not os.path.exists(REFERENCE_TOKENS):
 
+    #     print(
+    #         "Reference tokens not found."
+    #     )
+
+    #     if not os.path.exists(REFERENCE_WAV):
+    #         raise FileNotFoundError(
+    #             f"Reference WAV not found: {REFERENCE_WAV}"
+    #         )
+
+    #     print(
+    #         "Encoding reference voice with DAC..."
+    #     )
+
+    #     run_command(
+    #         "python3 -m fish_speech.models.dac.inference "
+    #         f"-i '{REFERENCE_WAV}' "
+    #         f"-o '{os.path.join('/app/fish-speech/output', 'reconstructed.wav')}' "
+    #         f"--checkpoint-path '{os.path.join(CHECKPOINT_PATH, 'codec.pth')}' "
+    #         "-d cuda"
+    #     )
+
+    #     # DAC inference creates reconstructed.npy next
+    #     # to the output WAV.
+
+    #     if not os.path.exists(REFERENCE_TOKENS):
+
+    #         raise RuntimeError(
+    #             "DAC finished but reconstructed.npy "
+    #             "was not created."
+    #         )
+
+    #     print(
+    #         "Reference tokens created."
+    #     )
+
+    # else:
+
+    #     print(
+    #         "Reference tokens already exist. "
+    #         "Skipping DAC encoding."
+    #     )
+
+    print("4")
+    j=0
+    for ref in REFERENCE_TOKENS: # if all(os.path.exists(ref) for ref in REFERENCE_TOKENS):
+        if not os.path.exists(ref):
+            j+=1
+    print("5")
+    if j == 0 :
         print(
-            "Reference tokens not found."
+            "Reference tokens already exist. "
+            "Skipping DAC encoding."
         )
+    else:
+        print(
+            "Reference tokens not (ALL?) found, we delete the existing ones if exists."
+        )
+        # Clean output directory
+        run_command("rm -rf /app/fish-speech/output/*")
 
-        if not os.path.exists(REFERENCE_WAV):
-            raise FileNotFoundError(
-                f"Reference WAV not found: {REFERENCE_WAV}"
+        print("7")
+        for ref in REFERENCE_WAV:
+            if not os.path.exists(ref):
+                raise FileNotFoundError(
+                    f"Reference WAV not found: {REFERENCE_WAV}"
             )
 
         print(
             "Encoding reference voice with DAC..."
         )
-
-        run_command(
-            "python3 -m fish_speech.models.dac.inference "
-            f"-i '{REFERENCE_WAV}' "
-            f"-o '{os.path.join('/app/fish-speech/output', 'reconstructed.wav')}' "
-            f"--checkpoint-path '{os.path.join(CHECKPOINT_PATH, 'codec.pth')}' "
-            "-d cuda"
-        )
-
+        
+        for ref in REFERENCE_WAV:
+            language = Path(ref).stem
+            output_path = os.path.join(
+            "/app/fish-speech/output",
+            f"reconstructed_{language}.wav",
+            )
+            run_command(
+                    "python3 -m fish_speech.models.dac.inference "
+                    f"-i '{ref}' "
+                    f"-o '{output_path}' "
+                    f"--checkpoint-path '{os.path.join(CHECKPOINT_PATH, 'codec.pth')}' "
+                    "-d cuda"
+                )
         # DAC inference creates reconstructed.npy next
         # to the output WAV.
 
-        if not os.path.exists(REFERENCE_TOKENS):
+        j=0
+        for ref in REFERENCE_TOKENS:
+            if not os.path.exists(ref):
+                j+=1
 
+        if j == 0 :
+            print(
+                "Reference tokens created."
+            )
+        else:
             raise RuntimeError(
                 "DAC finished but reconstructed.npy "
                 "was not created."
             )
 
-        print(
-            "Reference tokens created."
-        )
+    
+    # --------------------------------------------------------
+    # run patch for pytorch ! 
+    # --------------------------------------------------------
+    subprocess.run([
+    sys.executable,
+    "/app/fish-speech/patch_enable_fx_cache_aot.py"
+    ], check=True)
 
-    else:
+    subprocess.run([
+        sys.executable,
+        "/app/fish-speech/patch_force_aot_cache_save.py"
+    ], check=True)
 
-        print(
-            "Reference tokens already exist. "
-            "Skipping DAC encoding."
-        )
+    subprocess.run([
+        sys.executable,
+        "/app/fish-speech/patch_retry_aot_on_tensorify_restart.py"
+    ], check=True)
+
+    print("PyTorch patches sucessfully applied")
 
 
 # ============================================================
@@ -329,13 +528,36 @@ print("=" * 70)
 print("LOADING REFERENCE VOICE")
 print("=" * 70)
 
-reference_codes = torch.from_numpy(
-    np.load(REFERENCE_TOKENS)
+reference_codes_fr = torch.from_numpy(
+    np.load(REFERENCE_TOKENS_FR)
 )
-
 print(
     f"Reference codes shape: "
-    f"{reference_codes.shape}"
+    f"{reference_codes_fr.shape}"
+)
+
+reference_codes_en = torch.from_numpy(
+    np.load(REFERENCE_TOKENS_EN)
+)
+print(
+    f"Reference codes shape: "
+    f"{reference_codes_en.shape}"
+)
+
+reference_codes_es = torch.from_numpy(
+    np.load(REFERENCE_TOKENS_ES)
+)
+print(
+    f"Reference codes shape: "
+    f"{reference_codes_es.shape}"
+)
+
+reference_codes_de = torch.from_numpy(
+    np.load(REFERENCE_TOKENS_DE)
+)
+print(
+    f"Reference codes shape: "
+    f"{reference_codes_de.shape}"
 )
 
 
@@ -384,15 +606,33 @@ print("=" * 70)
 # ============================================================
 # GENERATE AUDIO
 # ============================================================
-# ============================================================
-# GENERATE AUDIO
-# ============================================================
 
-def generate_audio(text):
+def generate_audio(text, language, reload_anything):
 
     print("=" * 70)
     print("GENERATING AUDIO")
     print("=" * 70)
+
+
+    match language:
+        case "fr":
+            PROMPT_TEXT = PROMPT_TEXT_FR
+            reference_codes = reference_codes_fr
+
+        case "en":
+            PROMPT_TEXT = PROMPT_TEXT_EN
+            reference_codes = reference_codes_en
+
+        case "es":
+            PROMPT_TEXT = PROMPT_TEXT_ES
+            reference_codes = reference_codes_es
+
+        case "de":
+            PROMPT_TEXT = PROMPT_TEXT_DE
+            reference_codes = reference_codes_de
+
+        case _:
+            raise ValueError(f"Unknown language: {language}")
 
     print(
         f"Text: {text}"
@@ -439,7 +679,7 @@ def generate_audio(text):
                 temperature=TEMPERATURE,
                 repetition_penalty=REPETITION_PENALTY,
 
-                compile=COMPILE,
+                compile=False,# we don't use the mega cache as test from fill_pytorch_compile2.py are not sucessfful
 
                 iterative_prompt=True,
                 chunk_length=CHUNK_LENGTH,
@@ -553,66 +793,9 @@ def generate_audio(text):
     # TORCHINDUCTOR CACHE DIAGNOSTIC
     # --------------------------------------------------------
 
-    cache_dir = os.environ.get(
-        "TORCHINDUCTOR_CACHE_DIR",
-        "/runpod-volume/torchinductor-cache",
-    )
+    cache_diagnostics()
 
-    print("=" * 70)
-    print("TORCHINDUCTOR CACHE")
-    print("=" * 70)
-
-    print(
-        f"Cache directory: {cache_dir}"
-    )
-
-    if os.path.exists(cache_dir):
-
-        total_size = 0
-        file_count = 0
-
-        for root, dirs, files in os.walk(cache_dir):
-
-            for filename in files:
-
-                filepath = os.path.join(
-                    root,
-                    filename,
-                )
-
-                try:
-                    total_size += os.path.getsize(
-                        filepath
-                    )
-
-                    file_count += 1
-
-                except OSError:
-                    pass
-
-        print(
-            f"Cache exists: YES"
-        )
-
-        print(
-            f"Cache files: {file_count}"
-        )
-
-        print(
-            f"Cache size: "
-            f"{total_size / (1024 * 1024):.2f} MB"
-        )
-
-    else:
-
-        print(
-            "Cache exists: NO"
-        )
-
-    print("=" * 70)
-
-
-
+    
     total_time = (
         generation_time
         + decode_time
@@ -663,6 +846,139 @@ def generate_audio(text):
 # RUNPOD HANDLER
 # ============================================================
 
+# handler basic du début ne générant que qqch pour le francais 
+# def handler(job):
+
+#     """
+#     Expected request:
+
+#     {
+#         "input": {
+#             "text": "Bonjour, ceci est un test."
+#         }
+#     }
+
+#     For this diagnostic test, the same worker performs
+#     3 consecutive generations.
+#     """
+
+#     job_input = job.get(
+#         "input",
+#         {},
+#     )
+
+#     text = job_input.get(
+#         "text"
+#     )
+
+#     if not text:
+
+#         raise ValueError(
+#             "Missing required input: 'text'"
+#         )
+
+
+#     # --------------------------------------------------------
+#     # TEST TEXTS
+#     # --------------------------------------------------------
+
+#     test_texts = [
+#         text,
+
+#         "Ceci est la deuxième génération effectuée "
+#         "par le même worker Fish Speech.",
+
+#         "Et ceci est la troisième génération. "
+#         "Le modèle devrait maintenant être complètement chaud.",
+#     ]
+
+
+#     # --------------------------------------------------------
+#     # RUN 3 GENERATIONS
+#     # --------------------------------------------------------
+
+#     print("=" * 70)
+#     print("RUNNING 3 CONSECUTIVE GENERATIONS")
+#     print("=" * 70)
+
+#     results = []
+
+#     for i, test_text in enumerate(test_texts, start=1):
+
+#         print()
+#         print("=" * 70)
+#         print(f"GENERATION {i}/3")
+#         print("=" * 70)
+
+#         result = generate_audio(test_text)
+
+#         results.append(result)
+
+#         print(
+#             f"Generation {i}/3 finished in "
+#             f"{result['total_time']:.2f}s"
+#         )
+
+
+#     # --------------------------------------------------------
+#     # SUMMARY
+#     # --------------------------------------------------------
+
+#     print()
+#     print("=" * 70)
+#     print("3-GENERATION TEST SUMMARY")
+#     print("=" * 70)
+
+#     for i, result in enumerate(results, start=1):
+
+#         print(
+#             f"Generation {i}: "
+#             f"{result['num_tokens']} tokens | "
+#             f"{result['generation_time']:.2f}s generation | "
+#             f"{result['generation_time'] / result['num_tokens']:.2f}s/token | "
+#             f"{result['num_tokens'] / result['generation_time']:.2f} tok/s | "
+#             f"{result['duration']:.2f}s audio"
+#         )
+
+#     print("=" * 70)
+
+
+#     # --------------------------------------------------------
+#     # RETURN
+#     # --------------------------------------------------------
+
+#     # Return the audio from the LAST generation.
+#     # The statistics of all 3 generations are returned
+#     # so we can compare warm-up vs steady-state performance.
+
+#     return {
+#         "audio_base64": results[-1]["audio_base64"],
+
+#         "sample_rate": results[-1]["sample_rate"],
+
+#         "duration": results[-1]["duration"],
+
+#         "num_tokens": results[-1]["num_tokens"],
+
+#         "generation_time": results[-1]["generation_time"],
+
+#         "decode_time": results[-1]["decode_time"],
+
+#         "total_time": results[-1]["total_time"],
+
+#         "test_generations": [
+#             {
+#                 "generation": i + 1,
+#                 "duration": result["duration"],
+#                 "num_tokens": result["num_tokens"],
+#                 "generation_time": result["generation_time"],
+#                 "decode_time": result["decode_time"],
+#                 "total_time": result["total_time"],
+#             }
+#             for i, result in enumerate(results)
+#         ],
+#     }
+
 def handler(job):
 
     """
@@ -670,12 +986,19 @@ def handler(job):
 
     {
         "input": {
-            "text": "Bonjour, ceci est un test."
+            "text": "Bonjour, ceci est un test.",
+            "language": "fr"
         }
     }
 
+    Supported languages:
+        fr = French
+        en = English
+        es = Spanish
+        de = German
+
     For this diagnostic test, the same worker performs
-    3 consecutive generations.
+    3 consecutive generations in the selected language.
     """
 
     job_input = job.get(
@@ -687,10 +1010,66 @@ def handler(job):
         "text"
     )
 
+    language = job_input.get(
+        "language"
+    )
+
+    reload = job_input.get(
+            "reload_anything"
+        )
+
+    del_cache = job_input.get(
+                "del_cache"
+            )
+    
+
     if not text:
 
         raise ValueError(
             "Missing required input: 'text'"
+        )
+
+    if not language:
+
+        raise ValueError(
+            "Missing required input: 'language'"
+        )
+
+    if not reload:
+        raise ValueError(
+            "Missing required input: 'reload_anything'"
+        )
+
+    if not del_cache:
+            raise ValueError(
+                "Missing required input: 'del_cache'"
+            )
+    
+    if reload:
+        pull_git()
+
+    if del_cache:
+        print("cache is erased")
+        run_command("rm -rf /runpod-volume/torchinductor-cache/*")
+        cache_diagnostics()
+
+
+    # --------------------------------------------------------
+    # VALIDATE LANGUAGE
+    # --------------------------------------------------------
+
+    supported_languages = {
+        "fr": "French",
+        "en": "English",
+        "es": "Spanish",
+        "de": "German",
+    }
+
+    if language not in supported_languages:
+
+        raise ValueError(
+            f"Unsupported language: '{language}'. "
+            f"Supported languages: {list(supported_languages.keys())}"
         )
 
 
@@ -698,15 +1077,51 @@ def handler(job):
     # TEST TEXTS
     # --------------------------------------------------------
 
-    test_texts = [
-        text,
+    test_texts_by_language = {
 
-        "Ceci est la deuxième génération effectuée "
-        "par le même worker Fish Speech.",
+        "fr": [
+            text,
 
-        "Et ceci est la troisième génération. "
-        "Le modèle devrait maintenant être complètement chaud.",
-    ]
+            "Ceci est la deuxième génération effectuée "
+            "par le même worker Fish Speech.",
+
+            "Et ceci est la troisième génération. "
+            "Le modèle devrait maintenant être complètement chaud.",
+        ],
+
+        "en": [
+            text,
+
+            "This is the second generation performed "
+            "by the same Fish Speech worker.",
+
+            "And this is the third generation. "
+            "The model should now be completely warmed up.",
+        ],
+
+        "es": [
+            text,
+
+            "Esta es la segunda generación realizada "
+            "por el mismo worker de Fish Speech.",
+
+            "Y esta es la tercera generación. "
+            "El modelo debería estar ahora completamente caliente.",
+        ],
+
+        "de": [
+            text,
+
+            "Dies ist die zweite Generierung, die "
+            "vom selben Fish Speech Worker durchgeführt wird.",
+
+            "Und dies ist die dritte Generierung. "
+            "Das Modell sollte jetzt vollständig aufgewärmt sein.",
+        ],
+    }
+
+
+    test_texts = test_texts_by_language[language]
 
 
     # --------------------------------------------------------
@@ -717,6 +1132,10 @@ def handler(job):
     print("RUNNING 3 CONSECUTIVE GENERATIONS")
     print("=" * 70)
 
+    print(
+        f"Language: {supported_languages[language]} ({language})"
+    )
+
     results = []
 
     for i, test_text in enumerate(test_texts, start=1):
@@ -726,7 +1145,12 @@ def handler(job):
         print(f"GENERATION {i}/3")
         print("=" * 70)
 
-        result = generate_audio(test_text)
+        print(f"Text: {test_text}")
+
+        result = generate_audio(
+            test_text,
+            language=language,
+        )
 
         results.append(result)
 
@@ -768,29 +1192,44 @@ def handler(job):
     # so we can compare warm-up vs steady-state performance.
 
     return {
-        "audio_base64": results[-1]["audio_base64"],
 
-        "sample_rate": results[-1]["sample_rate"],
+        "audio_base64":
+            results[-1]["audio_base64"],
 
-        "duration": results[-1]["duration"],
+        "sample_rate":
+            results[-1]["sample_rate"],
 
-        "num_tokens": results[-1]["num_tokens"],
+        "duration":
+            results[-1]["duration"],
 
-        "generation_time": results[-1]["generation_time"],
+        "num_tokens":
+            results[-1]["num_tokens"],
 
-        "decode_time": results[-1]["decode_time"],
+        "generation_time":
+            results[-1]["generation_time"],
 
-        "total_time": results[-1]["total_time"],
+        "decode_time":
+            results[-1]["decode_time"],
+
+        "total_time":
+            results[-1]["total_time"],
+
+        "language":
+            language,
 
         "test_generations": [
+
             {
                 "generation": i + 1,
+                "text": test_texts[i],
+                "language": language,
                 "duration": result["duration"],
                 "num_tokens": result["num_tokens"],
                 "generation_time": result["generation_time"],
                 "decode_time": result["decode_time"],
                 "total_time": result["total_time"],
             }
+
             for i, result in enumerate(results)
         ],
     }
@@ -807,3 +1246,16 @@ if __name__ == "__main__":
             "handler": handler
         }
     )
+
+
+
+##Code de test dans l'onglet "request" de runpod
+
+# {
+#   "input": {
+#     "text": "Bonjour, ceci est un test.",
+#     "language": "fr",
+#     "reload_anything":False,
+#     "del_cache":False
+#   }
+# }

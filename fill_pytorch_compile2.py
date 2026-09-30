@@ -34,9 +34,9 @@ CODEC_CHECKPOINT = CHECKPOINT / "codec.pth"
 
 # choose the one you need to make test
 REFERENCE_AUDIO = Path("/app/fish-speech/input/fr.wav")
-REFERENCE_AUDIO = Path("/app/fish-speech/input/en.wav")
-REFERENCE_AUDIO = Path("/app/fish-speech/input/es.wav")
-REFERENCE_AUDIO = Path("/app/fish-speech/input/de.wav")
+# REFERENCE_AUDIO = Path("/app/fish-speech/input/en.wav")
+# REFERENCE_AUDIO = Path("/app/fish-speech/input/es.wav")
+# REFERENCE_AUDIO = Path("/app/fish-speech/input/de.wav")
 REDO_REF=True
 
 OUTPUT_DIR = Path("/app/fish-speech/output")
@@ -63,24 +63,24 @@ PROMPT_TEXT = (
     "Dans ces instants, tout semble plus léger, "
     "et je retrouve confiance en l'avenir."
 )
-PROMPT_TEXT = (
-    "This system converts written text into natural-sounding speech. "
-    "Each word is processed, analyzed for context, and generated with the correct intonation. "
-    "The goal is to make digital voices sound as close to human conversation as possible."
-)
+# PROMPT_TEXT = (
+#     "This system converts written text into natural-sounding speech. "
+#     "Each word is processed, analyzed for context, and generated with the correct intonation. "
+#     "The goal is to make digital voices sound as close to human conversation as possible."
+# )
 
-PROMPT_TEXT = (
-    "Camino por la playa temprano en la mañana. "
-    "El sonido de las olas acompaña mis pasos y las gaviotas vuelan sobre mi cabeza. "
-    "A veces me detengo a recoger una concha brillante. "
-    "Estos instantes me llenan de calma antes de que empiece el día."
-)
+# PROMPT_TEXT = (
+#     "Camino por la playa temprano en la mañana. "
+#     "El sonido de las olas acompaña mis pasos y las gaviotas vuelan sobre mi cabeza. "
+#     "A veces me detengo a recoger una concha brillante. "
+#     "Estos instantes me llenan de calma antes de que empiece el día."
+# )
 
-PROMPT_TEXT = (
-    "Dieses System wandelt geschriebenen Text in natürlich klingende Sprache um. "
-    "Jede Eingabe wird analysiert, der Kontext berücksichtigt und die richtige Betonung erzeugt. "
-    "Ziel ist es, digitale Stimmen so menschlich wie möglich klingen zu lassen."
-)
+# PROMPT_TEXT = (
+#     "Dieses System wandelt geschriebenen Text in natürlich klingende Sprache um. "
+#     "Jede Eingabe wird analysiert, der Kontext berücksichtigt und die richtige Betonung erzeugt. "
+#     "Ziel ist es, digitale Stimmen so menschlich wie möglich klingen zu lassen."
+# )
 
 
 
