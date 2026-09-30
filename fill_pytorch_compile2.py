@@ -36,7 +36,7 @@ CODEC_CHECKPOINT = CHECKPOINT / "codec.pth"
 REFERENCE_AUDIO = Path("/app/fish-speech/input/fr.wav")
 REFERENCE_AUDIO = Path("/app/fish-speech/input/en.wav")
 REFERENCE_AUDIO = Path("/app/fish-speech/input/es.wav")
-# REFERENCE_AUDIO = Path("/app/fish-speech/input/de.wav")
+REFERENCE_AUDIO = Path("/app/fish-speech/input/de.wav")
 REDO_REF=True
 
 OUTPUT_DIR = Path("/app/fish-speech/output")
@@ -76,11 +76,11 @@ PROMPT_TEXT = (
     "Estos instantes me llenan de calma antes de que empiece el día."
 )
 
-# PROMPT_TEXT = (
-#     "Dieses System wandelt geschriebenen Text in natürlich klingende Sprache um. "
-#     "Jede Eingabe wird analysiert, der Kontext berücksichtigt und die richtige Betonung erzeugt. "
-#     "Ziel ist es, digitale Stimmen so menschlich wie möglich klingen zu lassen."
-# )
+PROMPT_TEXT = (
+    "Dieses System wandelt geschriebenen Text in natürlich klingende Sprache um. "
+    "Jede Eingabe wird analysiert, der Kontext berücksichtigt und die richtige Betonung erzeugt. "
+    "Ziel ist es, digitale Stimmen so menschlich wie möglich klingen zu lassen."
+)
 
 
 
