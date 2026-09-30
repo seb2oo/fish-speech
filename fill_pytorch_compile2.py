@@ -188,6 +188,7 @@ else:
         DEVICE,
     ).cpu()
 
+    # if already existe, maybe will need to overwrite.. to check ...
     np.save(
         REFERENCE_CODES_PATH,
         reference_codes.numpy(),
